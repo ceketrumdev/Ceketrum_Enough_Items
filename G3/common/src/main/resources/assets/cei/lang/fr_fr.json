@@ -1,0 +1,27 @@
+{
+  "message.cei.no_recipe": "Aucune recette disponible",
+  "recipe.cei.cooking.header": "Cuisson",
+  "recipe.cei.smithing.header": "Forge",
+  "recipe.cei.stonecutting.header": "Tailleur de pierre",
+  "recipe.cei.brewing.header": "Alambic",
+  "recipe.cei.loot_sources.header": "Sources de butin",
+  "gui.cei.favorites": "Favoris",
+  "gui.cei.favorites.all": "Tous",
+  "gui.cei.config.title": "Configuration CEI",
+  "gui.cei.config.panel_position": "Position",
+  "gui.cei.config.panel_position.left": "Position: Gauche",
+  "gui.cei.config.panel_position.right": "Position: Droite",
+  "gui.cei.config.animations": "Animations",
+  "gui.cei.config.animations.on": "Animations: ON",
+  "gui.cei.config.animations.off": "Animations: OFF",
+  "gui.cei.config.favorites_default": "Favoris par défaut",
+  "gui.cei.config.favorites_default.on": "Favoris par défaut: ON",
+  "gui.cei.config.favorites_default.off": "Favoris par défaut: OFF",
+  "gui.cei.config.help_popup": "Popup d'aide",
+  "gui.cei.config.help_popup.on": "Popup d'aide: ON",
+  "gui.cei.config.help_popup.off": "Popup d'aide: OFF",
+  "gui.cei.config.apply": "Appliquer",
+  "gui.cei.config.cancel": "Annuler",
+  "gui.cei.config.reset": "Réinitialiser"
+}
+

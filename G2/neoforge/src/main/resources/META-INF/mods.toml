@@ -1,0 +1,30 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="ECLIPTEA-1.0"
+
+[[mods]]
+modId="cei"
+version="${version}"
+displayName="CEI"
+authors="Me!"
+description='''
+Ceketrum Enhanced Inventory - Advanced item browsing and recipe viewing system. Compatible with NeoForge.
+'''
+
+[[dependencies.cei]]
+modId="neoforge"
+mandatory=true
+versionRange="[20.4,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.cei]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.2,1.20.5)"
+ordering="NONE"
+side="BOTH"
+
+[[mixins]]
+config = "cei.client.mixins.json"
+

@@ -1,0 +1,55 @@
+plugins {
+    id 'dev.architectury.loom'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = "${project.archives_base_name}-G1-neoforge"
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven { url = "https://maven.minecraftforge.net/" }
+    maven { url = "https://maven.neoforged.net/releases/" }
+    maven { url = "https://maven.architectury.dev/" }
+}
+
+loom {
+    silentMojangMappingsLicense()
+    
+    forge {
+        mixinConfigs = [ "cei.client.mixins.json" ]
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ["src/main/java", "../common/src/main/java"]
+        }
+        resources {
+            srcDirs = ["src/main/resources", "../common/src/main/resources"]
+        }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    
+    forge "net.neoforged:forge:${project.neoforge_version}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 17
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}

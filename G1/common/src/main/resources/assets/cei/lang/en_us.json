@@ -1,0 +1,28 @@
+{
+  "message.cei.no_recipe": "No recipe available",
+  "recipe.cei.cooking.header": "Cooking",
+  "recipe.cei.smithing.header": "Smithing",
+  "recipe.cei.stonecutting.header": "Stonecutting",
+  "recipe.cei.brewing.header": "Brewing",
+  "recipe.cei.loot_sources.header": "Loot Sources",
+  "gui.cei.favorites": "Favorites",
+  "gui.cei.favorites.all": "All",
+  "gui.cei.config.title": "CEI Configuration",
+  "gui.cei.config.panel_position": "Position",
+  "gui.cei.config.panel_position.left": "Position: Left",
+  "gui.cei.config.panel_position.right": "Position: Right",
+  "gui.cei.config.animations": "Animations",
+  "gui.cei.config.animations.on": "Animations: ON",
+  "gui.cei.config.animations.off": "Animations: OFF",
+  "gui.cei.config.favorites_default": "Favorites by default",
+  "gui.cei.config.favorites_default.on": "Favorites by default: ON",
+  "gui.cei.config.favorites_default.off": "Favorites by default: OFF",
+  "gui.cei.config.help_popup": "Help popup",
+  "gui.cei.config.help_popup.on": "Help popup: ON",
+  "gui.cei.config.help_popup.off": "Help popup: OFF",
+  "gui.cei.config.apply": "Apply",
+  "gui.cei.config.cancel": "Cancel",
+  "gui.cei.config.reset": "Reset"
+}
+
+

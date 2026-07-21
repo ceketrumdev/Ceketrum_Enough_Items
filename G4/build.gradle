@@ -1,0 +1,13 @@
+// Root build.gradle for G4 version group
+plugins {
+    id 'idea'
+    id 'eclipse'
+}
+
+allprojects {
+    apply plugin: 'idea'
+    apply plugin: 'eclipse'
+    
+    group = 'com.ceketrum'
+    version = '0.1.3'
+}

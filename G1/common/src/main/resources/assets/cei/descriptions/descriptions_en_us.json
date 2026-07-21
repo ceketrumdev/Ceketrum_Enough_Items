@@ -1,0 +1,14 @@
+{
+  "minecraft:dirt": "Dirt, the fundamental base of Minecraft. Used for farming and construction. Can be tilled into farmland with a hoe.",
+  "minecraft:stone": "Stone, a robust building material. Can be smelted to obtain smooth stone or transformed into various decorative stone types.",
+  "minecraft:grass_block": "The grass block, symbol of nature in Minecraft. Allows grass growth and can be transformed into dirt with a shovel.",
+  "minecraft:cobblestone": "Cobblestone, obtained by mining stone. A versatile and durable building material.",
+  "minecraft:wooden_planks": "Wooden planks, basic building material. Obtained by crafting wood logs.",
+  "minecraft:iron_ingot": "Iron ingot, precious metal obtained by smelting iron ore. Essential for creating medium-quality tools and armor.",
+  "minecraft:gold_ingot": "Gold ingot, shiny and precious metal. Used to create fast but fragile tools, as well as decorative items.",
+  "minecraft:diamond": "Diamond, the most precious gem in Minecraft. Required to create the best tools, armor and weapons in the game.",
+  "minecraft:coal": "Coal, essential energy source. Used as fuel for furnaces and to create torches.",
+  "minecraft:torch": "Torch, portable light source. Essential for lighting dark areas and preventing hostile mob spawns."
+}
+
+

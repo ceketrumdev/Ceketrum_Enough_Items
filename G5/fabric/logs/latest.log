@@ -1,0 +1,15 @@
+[18:41:33] [main/INFO]: [STDOUT]: === Class: net.minecraft.world.item.crafting.RecipeBookCategories ===
+[18:41:33] [main/INFO]: [STDOUT]:     CRAFTING_BUILDING_BLOCKS -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:33] [main/INFO]: [STDOUT]:     CRAFTING_REDSTONE -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:33] [main/INFO]: [STDOUT]:     CRAFTING_EQUIPMENT -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]:     CRAFTING_MISC -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]:     FURNACE_FOOD -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]:     FURNACE_BLOCKS -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]:     FURNACE_MISC -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]:     BLAST_FURNACE_BLOCKS -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]:     BLAST_FURNACE_MISC -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]:     SMOKER_FOOD -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]:     STONECUTTER -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]:     SMITHING -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]:     CAMPFIRE -> net.minecraft.world.item.crafting.RecipeBookCategory
+[18:41:34] [main/INFO]: [STDOUT]: Class not found: net.minecraft.world.item.crafting.CraftingRecipeBookCategory

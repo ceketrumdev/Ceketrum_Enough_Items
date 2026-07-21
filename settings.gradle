@@ -1,0 +1,44 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		maven {
+			name = 'Forge'
+			url = 'https://maven.minecraftforge.net/'
+		}
+		maven {
+			name = 'NeoForged'
+			url = 'https://maven.neoforged.net/releases/'
+		}
+		maven {
+			name = 'Architectury'
+			url = 'https://maven.architectury.dev/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+rootProject.name = 'cei'
+
+include 'G1:fabric'
+
+include 'G2:fabric'
+include 'G2:neoforge'
+
+include 'G3:fabric'
+include 'G3:neoforge'
+
+include 'G4:fabric'
+include 'G4:neoforge'
+
+include 'G5:fabric'
+include 'G5:neoforge'
+
+include 'G6:fabric'
+include 'G6:neoforge'
+
+include 'G7:fabric'
+include 'G7:neoforge'

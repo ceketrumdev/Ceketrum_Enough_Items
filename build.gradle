@@ -1,0 +1,22 @@
+plugins {
+	id 'dev.architectury.loom' version '1.14.476' apply false
+}
+
+allprojects {
+	apply plugin: 'idea'
+	apply plugin: 'eclipse'
+	
+	group = 'com.ceketrum'
+	version = '0.1.3'
+
+	// Load parent group properties if they exist
+	def parentDir = project.parent ? project.parent.projectDir : project.projectDir
+	def propsFile = new File(parentDir, "gradle.properties")
+	if (propsFile.exists()) {
+		def props = new Properties()
+		propsFile.withInputStream { props.load(it) }
+		props.each { key, val ->
+			project.extensions.extraProperties.set(key, val)
+		}
+	}
+}

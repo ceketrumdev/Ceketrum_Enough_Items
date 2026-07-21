@@ -1,0 +1,18 @@
+{
+	"required": true,
+	"package": "com.ceketrum.cei.mixin.client",
+	"compatibilityLevel": "JAVA_21",
+	"plugin": "com.ceketrum.cei.mixin.client.CeiMixinConfigPlugin",
+	"client": [
+		"CeiScreenInjectionMixin261",
+		"CeiScreenInjectionMixin262",
+		"CeiMouseInjectionMixin261",
+		"CeiMouseInjectionMixin262",
+		"CeiKeyboardInjectionMixin261",
+		"CeiKeyboardInjectionMixin262",
+		"HandledScreenAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 0
+	}
+}

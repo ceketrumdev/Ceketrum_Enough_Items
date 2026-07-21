@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"id": "cei",
+	"version": "${version}",
+	"name": "CEI",
+	"description": "Ceketrum Enhanced Inventory - Advanced item browsing and recipe viewing system",
+	"authors": [
+		"Me!"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "ECLIPTEA-1.0",
+	"icon": "assets/cei/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.ceketrum.cei.CEI"
+		],
+		"client": [
+			"com.ceketrum.cei.CEIClient"
+		]
+	},
+	"mixins": [
+		"cei.mixins.json",
+		{
+			"config": "cei.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.18.4",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "com.ceketrum.mixin",
+	"compatibilityLevel": "JAVA_17",
+	"refmap": "cei-refmap.json",
+	"mixins": [],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
