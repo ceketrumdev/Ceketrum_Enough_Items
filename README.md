@@ -1,4 +1,4 @@
-# CEI - Ceketrum Enhanced Inventory
+# CEI - Ceketrum Enough Items
 
 [![CurseForge](https://img.shields.io/badge/CurseForge-CEI-orange?style=flat-square&logo=curseforge)](https://www.curseforge.com/minecraft/mc-mods/ceketrum-enough-items)
 [![Modrinth](https://img.shields.io/badge/Modrinth-CEI-green?style=flat-square&logo=modrinth)](https://modrinth.com/mod/ceketrum-enough-items)
@@ -7,7 +7,7 @@
 [![NeoForge](https://img.shields.io/badge/NeoForge-Supported-D33030?style=flat-square)](https://neoforged.net/)
 [![License](https://img.shields.io/badge/License-ECLIPTEA--1.0-4A90E2?style=flat-square)](LICENSE)
 
-**CEI (Ceketrum Enhanced Inventory)** is a modern, high-performance item browser, recipe viewer, and inventory overlay mod for Minecraft. Built with a modular multi-version architecture, CEI provides an intuitive alternative to JEI/REI/EMI with advanced recipe pinning, instant search, and seamless cross-version compatibility for **Fabric** and **NeoForge**.
+**CEI (Ceketrum Enough Items)** is a modern, high-performance item browser, recipe viewer, and inventory overlay mod for Minecraft. Built with a modular multi-version architecture, CEI provides an intuitive alternative to JEI/REI/EMI with advanced recipe pinning, instant search, and seamless cross-version compatibility for **Fabric** and **NeoForge**.
 
 ---
 
