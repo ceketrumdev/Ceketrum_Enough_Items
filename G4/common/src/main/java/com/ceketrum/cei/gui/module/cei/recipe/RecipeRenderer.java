@@ -18,6 +18,30 @@ public class RecipeRenderer {
     private final StonecutterRecipeRenderer stonecutterRenderer = new StonecutterRecipeRenderer();
     private final CustomMachineRecipeRenderer customMachineRenderer = new CustomMachineRecipeRenderer();
     
+
+    /**
+     * Chemin de rendu unifie, actif seulement si l'option est cochee.
+     *
+     * Il cohabite volontairement avec les renderers historiques : tant que les
+     * deux existent, on peut comparer le meme pack cote a cote avant de
+     * supprimer l'ancien.
+     *
+     * @return la position Y apres rendu, ou -1 si le nouveau chemin ne s'applique pas
+     */
+    private int tryRenderNew(GuiGraphics context, int startX, int startY,
+                             Recipe<?> recipe, RegistryAccess registries,
+                             net.minecraft.client.gui.Font textRenderer) {
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isUseNewRecipeRenderer()) {
+            return -1;
+        }
+        var view = com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeAdapter.from(recipe, registries);
+        if (view == null) {
+            return -1;
+        }
+        return com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeViewRenderer.render(
+                context, startX, startY, view, textRenderer, System.currentTimeMillis());
+    }
+
     /**
      * Rend une recette de type crafting.
      * Si une recette de cuisson est associée, on l'affiche en dessous.
@@ -29,6 +53,9 @@ public class RecipeRenderer {
                                     ItemStack hoveredStack,
                                     String itemDescription,
                                     net.minecraft.client.gui.Font textRenderer) {
+        int newPathY = tryRenderNew(context, startX, startY, recipe, dynamicRegistryManager, textRenderer);
+        if (newPathY >= 0) return newPathY;
+
         int currentY = craftingRenderer.render(context, startX, startY, recipe, recipeEntry, 
                                               dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
         
@@ -52,6 +79,9 @@ public class RecipeRenderer {
                                   ItemStack hoveredStack,
                                   String itemDescription,
                                   net.minecraft.client.gui.Font textRenderer) {
+        int newPathY = tryRenderNew(context, startX, startY, recipe, dynamicRegistryManager, textRenderer);
+        if (newPathY >= 0) return newPathY;
+
         return smeltingRenderer.render(context, startX, startY, recipe, recipeEntry, 
                                       dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
     }
@@ -65,6 +95,9 @@ public class RecipeRenderer {
                                    ItemStack hoveredStack,
                                    String itemDescription,
                                    net.minecraft.client.gui.Font textRenderer) {
+        int newPathY = tryRenderNew(context, startX, startY, recipe, dynamicRegistryManager, textRenderer);
+        if (newPathY >= 0) return newPathY;
+
         return smithingRenderer.render(context, startX, startY, recipe, recipeEntry, 
                                       dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
     }
@@ -102,6 +135,9 @@ public class RecipeRenderer {
                                       ItemStack hoveredStack,
                                       String itemDescription,
                                       net.minecraft.client.gui.Font textRenderer) {
+        int newPathY = tryRenderNew(context, startX, startY, recipe, dynamicRegistryManager, textRenderer);
+        if (newPathY >= 0) return newPathY;
+
         return stonecutterRenderer.render(context, startX, startY, recipe, recipeEntry, 
                                          dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
     }
@@ -115,6 +151,9 @@ public class RecipeRenderer {
                                          ItemStack hoveredStack,
                                          String itemDescription,
                                          net.minecraft.client.gui.Font textRenderer) {
+        int newPathY = tryRenderNew(context, startX, startY, recipe, dynamicRegistryManager, textRenderer);
+        if (newPathY >= 0) return newPathY;
+
         return customMachineRenderer.render(context, startX, startY, recipe, recipeEntry,
                                            dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
     }

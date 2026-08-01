@@ -1,0 +1,42 @@
+plugins {
+    id 'net.fabricmc.fabric-loom'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = "${project.archives_base_name}-G8-fabric"
+}
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    main {
+        java      { srcDirs = ["src/main/java",      "../common/src/main/java"] }
+        resources { srcDirs = ["src/main/resources", "../common/src/main/resources"] }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    // 26.x : plus de remap, donc implementation et non modImplementation
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+    withSourcesJar()
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching("fabric.mod.json") { expand "version": inputs.properties.version }
+}
+
+tasks.withType(Copy).configureEach { duplicatesStrategy = DuplicatesStrategy.INCLUDE }
+tasks.withType(Jar).configureEach  { duplicatesStrategy = DuplicatesStrategy.INCLUDE }

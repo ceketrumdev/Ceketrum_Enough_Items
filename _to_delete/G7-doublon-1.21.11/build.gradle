@@ -1,0 +1,13 @@
+// Root build.gradle for G7 version group
+plugins {
+    id 'idea'
+    id 'eclipse'
+}
+
+allprojects {
+    apply plugin: 'idea'
+    apply plugin: 'eclipse'
+    
+    group = 'com.ceketrum'
+    version = '0.1.3'
+}

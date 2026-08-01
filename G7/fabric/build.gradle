@@ -1,5 +1,5 @@
 plugins {
-    id 'dev.architectury.loom'
+    id 'net.fabricmc.fabric-loom'
     id 'maven-publish'
 }
 
@@ -12,66 +12,31 @@ base {
 
 repositories {
     mavenCentral()
-    mavenLocal()
-}
-
-loom {
-    silentMojangMappingsLicense()
-    splitEnvironmentSourceSets()
 }
 
 sourceSets {
     main {
-        java {
-            srcDirs = ["src/main/java"]
-        }
-        resources {
-            srcDirs = ["src/main/resources"]
-        }
-    }
-    client {
-        java {
-            srcDirs = ["src/client/java", "../common/src/main/java"]
-        }
-        resources {
-            srcDirs = ["src/client/resources", "../common/src/main/resources"]
-        }
+        java      { srcDirs = ["src/main/java",      "../common/src/main/java"] }
+        resources { srcDirs = ["src/main/resources", "../common/src/main/resources"] }
     }
 }
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings loom.officialMojangMappings()
-
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    // 26.x : plus de remap, donc implementation et non modImplementation
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 }
 
-remapJar {
-    targetNamespace = "named"
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+    withSourcesJar()
 }
 
 processResources {
     inputs.property "version", project.version
-
-    filesMatching("fabric.mod.json") {
-        expand "version": inputs.properties.version
-    }
+    filesMatching("fabric.mod.json") { expand "version": inputs.properties.version }
 }
 
-tasks.withType(Copy).configureEach {
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-}
-tasks.withType(Jar).configureEach {
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-}
-
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
-}
-
-java {
-    withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
+tasks.withType(Copy).configureEach { duplicatesStrategy = DuplicatesStrategy.INCLUDE }
+tasks.withType(Jar).configureEach  { duplicatesStrategy = DuplicatesStrategy.INCLUDE }

@@ -17,7 +17,7 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 @Mod("cei")
 public class CEINeoForge {
@@ -44,7 +44,7 @@ public class CEINeoForge {
         public static void registerGuiLayers(RegisterGuiLayersEvent event) {
             event.registerAbove(VanillaGuiLayers.HOTBAR, Identifier.fromNamespaceAndPath("cei", "hud"), (guiGraphics, deltaTracker) -> {
                 var client = Minecraft.getInstance();
-                if (client.screen == null) {
+                if (com.ceketrum.cei.gui.util.CeiScreens.current() == null) {
                     var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
                     for (var card : manager.getPinnedCards()) {
                         if (card.isShowInHud()) {
@@ -61,7 +61,7 @@ public class CEINeoForge {
                                 if (pinnedScreen.width != window.getGuiScaledWidth() || pinnedScreen.height != window.getGuiScaledHeight()) {
                                     pinnedScreen.init(window.getGuiScaledWidth(), window.getGuiScaledHeight());
                                 }
-                                pinnedScreen.render(guiGraphics, -999, -999, 1.0f);
+                                pinnedScreen.extractRenderState(guiGraphics, -999, -999, 1.0f);
                             }
                         }
                     }
@@ -73,12 +73,18 @@ public class CEINeoForge {
     public static class GameplayEvents {
         @SubscribeEvent
         public static void onPlayerLoggedIn(ClientPlayerNetworkEvent.LoggingIn event) {
+            // La liste d'items est partagee entre les ecrans : on la reconstruit
+            // a la connexion pour prendre en compte les items du serveur / des mods.
+            com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
             BrewingRecipeManager.getInstance().clearCache();
             LootTableSourceManager.getInstance().clearCache();
         }
         
         @SubscribeEvent
         public static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
+            // La liste d'items est partagee entre les ecrans : on la reconstruit
+            // a la connexion pour prendre en compte les items du serveur / des mods.
+            com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
             BrewingRecipeManager.getInstance().clearCache();
             LootTableSourceManager.getInstance().clearCache();
         }

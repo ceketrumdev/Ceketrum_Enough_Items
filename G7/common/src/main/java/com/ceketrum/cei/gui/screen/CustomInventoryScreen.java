@@ -1,7 +1,7 @@
 package com.ceketrum.cei.gui.screen;
 
 import com.ceketrum.cei.gui.module.cei.CeiModule;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.player.LocalPlayer;
 
@@ -18,9 +18,9 @@ public class CustomInventoryScreen extends InventoryScreen {
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         // Rendre d'abord l'inventaire (qui inclut le modèle du joueur)
-        super.renderBackground(context, mouseX, mouseY, delta);
+        // 26.x : le fond est deja extrait par le wrapper (un seul flou par frame).
         
         assert this.minecraft != null;
         int screenHeight = this.minecraft.getWindow().getGuiScaledHeight();
@@ -33,7 +33,7 @@ public class CustomInventoryScreen extends InventoryScreen {
                         this.minecraft.player.level().registryAccess());
         
         // Rendre l'inventaire (items + modèle du joueur)
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
     
     @Override
@@ -56,6 +56,7 @@ public class CustomInventoryScreen extends InventoryScreen {
         int screenWidth = this.minecraft.getWindow().getGuiScaledWidth();
         int screenHeight = this.minecraft.getWindow().getGuiScaledHeight();
         
+        com.ceketrum.cei.gui.util.CeiScreenHelper.setShiftDown(event.hasShiftDown());
         if (ceiModule.handleMouseClick(event.x(), event.y(), event.button(), screenWidth, screenHeight, this.minecraft.font)) {
             return true;
         }
@@ -65,7 +66,7 @@ public class CustomInventoryScreen extends InventoryScreen {
     
     @Override
     public boolean charTyped(net.minecraft.client.input.CharacterEvent event) {
-        if (ceiModule.handleCharTyped((char) event.codepoint(), event.modifiers())) {
+        if (ceiModule.handleCharTyped((char) event.codepoint(), 0)) {
             return true;
         }
         return super.charTyped(event);
@@ -75,7 +76,7 @@ public class CustomInventoryScreen extends InventoryScreen {
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
         assert this.minecraft != null;
         
-        if (ceiModule.handleKeyPress(event.key(), event.scancode(), event.modifiers())) {
+        if (ceiModule.handleKeyPress(com.ceketrum.cei.gui.util.CeiInput.key(event), com.ceketrum.cei.gui.util.CeiInput.scancode(event), 0)) {
             return true;
         }
         

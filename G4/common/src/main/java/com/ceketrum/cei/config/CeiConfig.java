@@ -47,6 +47,13 @@ public class CeiConfig {
     
     // Popup d'aide
     private boolean showHelpPopup = true;
+
+    /**
+     * Active le nouveau pipeline de recettes (CeiRecipeView) au lieu des huit
+     * renderers historiques. Les deux chemins cohabitent le temps de comparer
+     * le rendu, notamment sur les recettes moddees qui sortent du format 3x3.
+     */
+    private boolean useNewRecipeRenderer = true;
     
     private CeiConfig() {
         Path configDir = PlatformHelper.getConfigDirectory().resolve("cei");
@@ -104,6 +111,9 @@ public class CeiConfig {
             
             // Popup d'aide
             if (json.has("showHelpPopup")) showHelpPopup = json.get("showHelpPopup").getAsBoolean();
+
+            // Nouveau pipeline de recettes (chemin parallele, cf. CeiRecipeAdapter)
+            if (json.has("useNewRecipeRenderer")) useNewRecipeRenderer = json.get("useNewRecipeRenderer").getAsBoolean();
             
             LOGGER.info("Configuration chargée depuis {}", configFile);
         } catch (Exception e) {
@@ -142,6 +152,7 @@ public class CeiConfig {
             
             // Popup d'aide
             json.addProperty("showHelpPopup", showHelpPopup);
+            json.addProperty("useNewRecipeRenderer", useNewRecipeRenderer);
             
             Files.writeString(configFile, json.toString());
             LOGGER.debug("Configuration sauvegardée dans {}", configFile);
@@ -203,6 +214,9 @@ public class CeiConfig {
     public void setHoverColor(int hoverColor) { this.hoverColor = hoverColor; }
     
     // Getters et setters pour les animations
+    public boolean isUseNewRecipeRenderer() { return useNewRecipeRenderer; }
+    public void setUseNewRecipeRenderer(boolean v) { this.useNewRecipeRenderer = v; }
+
     public boolean isEnableAnimations() { return enableAnimations; }
     public void setEnableAnimations(boolean enableAnimations) { this.enableAnimations = enableAnimations; }
     public float getAnimationSpeed() { return animationSpeed; }
@@ -233,6 +247,7 @@ public class CeiConfig {
         animationSpeed = 1.0f;
         showFavoritesByDefault = false;
         showHelpPopup = true;
+        useNewRecipeRenderer = true;
         save();
     }
 }

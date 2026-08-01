@@ -771,10 +771,13 @@ public class CeiItemInfoScreen extends Screen {
             case STONECUTTING -> isFr ? "Tailleur de Pierre" : "Stonecutter";
             case SMITHING -> isFr ? "Table de Forgeron" : "Smithing Table";
             case CUSTOM -> {
-                if (titleIcon.getItem() == Items.DISPENSER) {
-                    yield isFr ? "Machine Spéciale" : "Custom Machine";
+                // Le libelle vient desormais du type de recette lui-meme :
+                // create:crushing doit s'afficher "Crushing Wheel", pas
+                // "Custom Machine". Cf. CeiRecipeStation.
+                if (finalRecipe != null) {
+                    yield getMachineLabel(finalRecipe, isFr);
                 }
-                yield titleIcon.getHoverName().getString();
+                yield isFr ? "Machine Spéciale" : "Custom Machine";
             }
         };
         
@@ -977,41 +980,81 @@ public class CeiItemInfoScreen extends Screen {
             case CUSTOM: {
                 RecipeHolder<?> entry = (RecipeHolder<?>) recipeObj;
                 Recipe<?> recipe = entry.value();
-                
+
+                // Nouveau pipeline : la grille vient de la recette elle-meme.
+                // L'ancien code plafonnait a 4 entrees sur une seule ligne
+                // (Math.min(4, totalInputs)), ce qui tronquait toute recette
+                // moddee depassant ce format et en perdait la disposition.
+                var view = com.ceketrum.cei.config.CeiConfig.getInstance().isUseNewRecipeRenderer()
+                        ? com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeAdapter.from(recipe, rm)
+                        : null;
+
+                if (view != null) {
+                    long now = System.currentTimeMillis();
+                    int cols = Math.max(1, view.gridWidth());
+                    int rows = Math.max(1, view.gridHeight());
+
+                    List<ItemStack> vOutputs = view.outputs();
+                    if (vOutputs.isEmpty() && activeMainTab == TabType.CRAFTING) {
+                        vOutputs = List.of(targetStack);
+                    }
+                    int displayOut = Math.max(1, Math.min(4, vOutputs.size()));
+
+                    int gridW = cols * 20;
+                    int outW = displayOut * 20;
+                    int totalW = gridW + 24 + outW;
+                    int startX = contentX + (contentWidth - totalW) / 2;
+                    int startY = contentY + 24;
+
+                    for (int r = 0; r < rows; r++) {
+                        for (int c = 0; c < cols; c++) {
+                            int slotX = startX + c * 20;
+                            int slotY = startY + r * 20;
+                            drawSlotBg(context, slotX, slotY);
+                            ItemStack stack = view.slotAt(c, r).current(now);
+                            if (stack != null && !stack.isEmpty()) {
+                                context.renderItem(stack, slotX + 1, slotY + 1);
+                                activeSlots.add(new RenderedSlot(stack, slotX, slotY, 18));
+                            }
+                        }
+                    }
+
+                    int midY = startY + (rows * 20) / 2 - 9;
+                    drawArrow(context, startX + gridW + 3, midY + 2);
+
+                    for (int i = 0; i < displayOut; i++) {
+                        int slotX = startX + gridW + 24 + i * 20;
+                        drawSlotBg(context, slotX, midY);
+                        ItemStack stack = i < vOutputs.size() ? vOutputs.get(i) : ItemStack.EMPTY;
+                        if (stack != null && !stack.isEmpty()) {
+                            context.renderItem(stack, slotX + 1, midY + 1);
+                            activeSlots.add(new RenderedSlot(stack, slotX, midY, 18));
+                        }
+                    }
+                    break;
+                }
+
+                // --- ancien chemin, conserve tant que les deux cohabitent ---
                 List<ItemStack> inputs = extractCustomInputs(recipe);
                 List<ItemStack> outputs = extractCustomOutputs(recipe, rm);
-                
-                // Ensure we have at least one input and output to show
+
                 if (inputs.isEmpty()) {
-                    if (activeMainTab == TabType.USAGES) {
-                        inputs.add(targetStack);
-                    } else {
-                        inputs.add(ItemStack.EMPTY);
-                    }
+                    if (activeMainTab == TabType.USAGES) inputs.add(targetStack);
+                    else inputs.add(ItemStack.EMPTY);
                 }
                 if (outputs.isEmpty()) {
-                    if (activeMainTab == TabType.CRAFTING) {
-                        outputs.add(targetStack);
-                    } else {
-                        outputs.add(ItemStack.EMPTY);
-                    }
+                    if (activeMainTab == TabType.CRAFTING) outputs.add(targetStack);
+                    else outputs.add(ItemStack.EMPTY);
                 }
-                
-                int totalInputs = inputs.size();
-                int totalOutputs = outputs.size();
-                
-                // Limit to 4 inputs and 4 outputs for single-line horizontal alignment
-                int displayInputs = Math.min(4, totalInputs);
-                int displayOutputs = Math.min(4, totalOutputs);
-                
+
+                int displayInputs = Math.min(4, inputs.size());
+                int displayOutputs = Math.min(4, outputs.size());
                 int inputsWidth = displayInputs * 20;
                 int outputsWidth = displayOutputs * 20;
                 int totalWidth = inputsWidth + 24 + outputsWidth;
-                
                 int startX = contentX + (contentWidth - totalWidth) / 2;
                 int startY = contentY + 24;
-                
-                // Draw Inputs
+
                 for (int i = 0; i < displayInputs; i++) {
                     int slotX = startX + i * 20;
                     drawSlotBg(context, slotX, startY);
@@ -1021,13 +1064,9 @@ public class CeiItemInfoScreen extends Screen {
                         activeSlots.add(new RenderedSlot(stack, slotX, startY, 18));
                     }
                 }
-                
-                // Draw Arrow
-                int arrowX = startX + inputsWidth + 3;
-                int arrowY = startY + 2;
-                drawArrow(context, arrowX, arrowY);
-                
-                // Draw Outputs
+
+                drawArrow(context, startX + inputsWidth + 3, startY + 2);
+
                 for (int i = 0; i < displayOutputs; i++) {
                     int slotX = startX + inputsWidth + 24 + i * 20;
                     drawSlotBg(context, slotX, startY);
@@ -1161,10 +1200,7 @@ public class CeiItemInfoScreen extends Screen {
                                 }
                             }
                             if (matchedRecipe != null) {
-                                ItemStack machineStack = getMachineIcon(matchedRecipe);
-                                if (machineStack.getItem() != Items.DISPENSER) {
-                                    yield machineStack.getHoverName().getString();
-                                }
+                                yield getMachineLabel(matchedRecipe, isFr);
                             }
                             yield isFr ? "Machine Spéciale (Mod)" : "Special Machine (Mod)";
                         }
@@ -1824,7 +1860,59 @@ public class CeiItemInfoScreen extends Screen {
         }
     }
 
+    /**
+     * Libelle de la station de travail d'une recette moddee.
+     *
+     * L'ancien comportement affichait "Custom Machine" des que l'icone retombait
+     * sur le distributeur, c'est-a-dire pour la quasi-totalite des recettes
+     * moddees. On passe ici par CeiRecipeStation, qui derive un nom du type de
+     * recette (create:crushing -> "Crushing Wheel", a defaut "Crushing").
+     */
+    private String getMachineLabel(Recipe<?> recipe, boolean isFr) {
+        if (recipe == null) return isFr ? "Machine Spéciale" : "Custom Machine";
+        ItemStack icon = getMachineIcon(recipe);
+        if (icon != null && !icon.isEmpty() && icon.getItem() != Items.DISPENSER) {
+            String name = icon.getHoverName().getString();
+            if (name != null && !name.isBlank()) return name;
+        }
+        ResourceLocation typeId = null;
+        try {
+            typeId = BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType());
+        } catch (Exception e) {
+            // type non enregistre : on laisse CeiRecipeStation gerer le null
+        }
+        return com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation.labelFor(typeId, isFr);
+    }
+
+    /**
+     * Memorisation des icones de machine.
+     *
+     * getMachineIconUncached finit par balayer tout le registre des items dans
+     * son dernier repli. Sans cache, ce balayage avait lieu a CHAQUE frame et
+     * pour chaque onglet de categorie affiche -- un cout invisible en vanilla,
+     * net sur un gros pack modde. La cle est le type de recette : deux recettes
+     * du meme type donnent la meme icone.
+     */
+    private static final java.util.Map<ResourceLocation, ItemStack> MACHINE_ICON_CACHE = new java.util.HashMap<>();
+
     private ItemStack getMachineIcon(Recipe<?> recipe) {
+        if (recipe == null) return new ItemStack(Items.DISPENSER);
+        ResourceLocation typeId = null;
+        try {
+            typeId = BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType());
+        } catch (Exception e) {
+            // type non enregistre : on ne memorise pas, on calcule a chaque fois
+        }
+        if (typeId == null) return getMachineIconUncached(recipe);
+        ItemStack cached = MACHINE_ICON_CACHE.get(typeId);
+        if (cached == null) {
+            cached = getMachineIconUncached(recipe);
+            MACHINE_ICON_CACHE.put(typeId, cached);
+        }
+        return cached.copy();
+    }
+
+    private ItemStack getMachineIconUncached(Recipe<?> recipe) {
         var client = Minecraft.getInstance();
         if (client.level == null) return new ItemStack(Items.DISPENSER);
         
@@ -1947,6 +2035,15 @@ public class CeiItemInfoScreen extends Screen {
                 if (fallbackBlock != null && fallbackBlock != Items.AIR) return new ItemStack(fallbackBlock);
             }
             
+            // Repli generique fonde sur l'identifiant du type de recette :
+            // create:crushing -> create:crushing_wheel. Aucune connaissance
+            // specifique a un mod, et le resultat est memorise. Place AVANT la
+            // recherche floue ci-dessous, qui compare des sous-chaines de noms
+            // de classe et peut renvoyer a peu pres n'importe quel item.
+            ItemStack station = com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation
+                    .iconFor(BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType()));
+            if (!station.isEmpty()) return station;
+
             // 3. Fuzzy search in same namespace
             if (namespace != null) {
                 for (ResourceLocation id : BuiltInRegistries.ITEM.keySet()) {

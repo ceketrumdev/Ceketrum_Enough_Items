@@ -6,7 +6,7 @@ license="ECLIPTEA-1.0"
 modId="cei"
 version="${version}"
 displayName="CEI"
-authors="Me!"
+authors="Ceketrum"
 description='''
 Ceketrum Enhanced Inventory - Advanced item browsing and recipe viewing system. Compatible with NeoForge.
 '''

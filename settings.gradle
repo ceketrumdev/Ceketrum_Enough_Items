@@ -40,5 +40,6 @@ include 'G5:neoforge'
 include 'G6:fabric'
 include 'G6:neoforge'
 
-include 'G7:fabric'
-include 'G7:neoforge'
+// G7 (26.1 -> 26.3) est un build Gradle AUTONOME, volontairement absent d'ici :
+// il exige Loom 1.17 / Gradle 9.5.1 / Java 25, incompatibles avec G1..G6.
+// Il se construit depuis G7/ ; build_all.bat enchaine les deux.

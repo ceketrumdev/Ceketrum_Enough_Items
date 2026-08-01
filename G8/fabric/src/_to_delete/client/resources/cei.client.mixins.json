@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "package": "com.ceketrum.cei.mixin.client",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "CeiScreenInjectionMixin",
+    "CeiRecipeBookScreenMixin",
+    "CeiMouseInjectionMixin",
+    "CeiKeyboardInjectionMixin",
+    "HandledScreenAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

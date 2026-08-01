@@ -1,7 +1,7 @@
 package com.ceketrum.cei.gui.screen;
 
 import com.ceketrum.cei.config.CeiConfig;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -85,7 +85,7 @@ public class CeiConfigScreen extends Screen {
 
         cancelButton = Button.builder(
             Component.translatable("gui.cei.config.cancel"),
-            button -> minecraft.setScreen(parent)
+            button -> com.ceketrum.cei.gui.util.CeiScreens.set(parent)
         ).bounds(centerX - 40, buttonY, 80, 20).build();
         addRenderableWidget(cancelButton);
 
@@ -111,23 +111,24 @@ public class CeiConfigScreen extends Screen {
     private void applyChanges() {
         // Tous les changements sont déjà appliqués en temps réel via les boutons
         config.save();
-        minecraft.setScreen(parent);
+        com.ceketrum.cei.gui.util.CeiScreens.set(parent);
     }
     
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-        renderBackground(context, mouseX, mouseY, delta);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        // 26.x : extractRenderStateWithTooltipAndSubtitles appelle deja
+        // extractBackground. Un second appel -> "Can only blur once per frame".
         
         int centerX = width / 2;
         int titleY = 20;
-        context.drawCenteredString(font, title, centerX, titleY, 0xFFFFFFFF);
+        context.centeredText(font, title, centerX, titleY, 0xFFFFFFFF);
         
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
     
     @Override
     public void onClose() {
-        minecraft.setScreen(parent);
+        com.ceketrum.cei.gui.util.CeiScreens.set(parent);
     }
 }
 

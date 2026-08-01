@@ -45,7 +45,30 @@ public class BlockGenerationManager {
      * Assure que le cache de génération de blocs est construit en solo.
      * Explore récursivement tous les biomes et leurs PlacedFeatures.
      */
+    /**
+     * Passe a true si l'exploration echoue sur une API absente de la version
+     * courante. Les classes de generation / loot / brassage bougent d'une
+     * version a l'autre (ConfiguredFeature a par exemple disparu en 26.3) :
+     * une fonctionnalite annexe ne doit pas faire tomber le client.
+     */
+    private volatile boolean cei$degraded = false;
+
     public synchronized void ensureCacheBuilt() {
+        if (cei$degraded) {
+            return;
+        }
+        try {
+            cei$ensureCacheBuiltImpl();
+        } catch (LinkageError | Exception e) {
+            cei$degraded = true;
+            org.slf4j.LoggerFactory.getLogger("cei").warn(
+                "CEI: BlockGenerationManager desactive sur cette version de Minecraft ({}). "
+                + "La fonctionnalite associee restera vide, le reste du mod fonctionne.",
+                e.toString());
+        }
+    }
+
+    private synchronized void cei$ensureCacheBuiltImpl() {
         if (isCacheBuilt) return;
         
         Minecraft client = Minecraft.getInstance();

@@ -27,11 +27,20 @@ public abstract class CeiScreenInjectionMixin extends Screen {
         return true;
     }
     
+    @Unique
+    private boolean cei$hasRecipeBook() {
+        return (Object)this instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen || (Object)this instanceof net.minecraft.client.gui.screens.inventory.CraftingScreen || (Object)this instanceof net.minecraft.client.gui.screens.inventory.AbstractFurnaceScreen;
+    }
+
     @Inject(
         method = "render",
         at = @At("TAIL")
     )
     private void cei$render(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        if (cei$hasRecipeBook()) {
+            return;
+        }
+
         if (!cei$isValidScreen()) {
             return;
         }
@@ -100,6 +109,10 @@ public abstract class CeiScreenInjectionMixin extends Screen {
         cancellable = true
     )
     private void cei$mouseClicked(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+        if (cei$hasRecipeBook()) {
+            return;
+        }
+
         if (!cei$isValidScreen()) {
             return;
         }

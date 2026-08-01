@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -32,9 +32,19 @@ public class CeiModule {
     
     private boolean isRecipePopupVisible = false;
     private ItemStack hoveredStack = null;
-    private List<ItemStack> allItemsCache = null;
+    /**
+     * Liste de tous les items du jeu, PARTAGEE entre toutes les instances.
+     * Elle ne depend pas de l'ecran ouvert : la garder par instance obligeait a
+     * reparcourir tout le registre a chaque ouverture de conteneur.
+     * Invalidee a la connexion (voir invalidateItemCache).
+     */
+    private static volatile List<ItemStack> SHARED_ITEMS = null;
+    /** Index de recherche, meme ordre que SHARED_ITEMS, deja en minuscules. */
+    private static volatile List<String> SHARED_BLOBS = null;
+
     private List<ItemStack> filteredItemsCache = null;
     private String lastSearchText = "";
+    private boolean lastShowFavoritesOnly = false;
     private boolean hasCheckedHelpPopup = false;
     
     public CeiModule() {
@@ -70,7 +80,7 @@ public class CeiModule {
      * @param recipeManager Le RecipeManager pour afficher les recettes
      * @param registryManager Le DynamicRegistryManager pour les recettes
      */
-    public void render(Object context, int mouseX, int mouseY, 
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, 
                       int screenWidth, int screenHeight,
                       Font textRenderer,
                       net.minecraft.world.item.crafting.RecipeAccess recipeAccess,
@@ -84,10 +94,9 @@ public class CeiModule {
         // Filtrer les items selon la recherche
         String currentSearchText = panelRenderer.getSearchBar().getSearchText();
         if (!currentSearchText.equals(lastSearchText)) {
-            // La recherche a changé, réinitialiser le cache et le scroll
-            filteredItemsCache = null;
+            // Le scroll se remet a zero ; l'invalidation du cache appartient a
+            // getFilteredItems(), qui met aussi lastSearchText a jour.
             itemListRenderer.resetScroll();
-            lastSearchText = currentSearchText;
         }
         
         List<ItemStack> itemsToDisplay = getFilteredItems();
@@ -188,11 +197,15 @@ public class CeiModule {
         int maxVisibleRows = availableHeight / GuiConstants.SLOT_SIZE;
         int maxVisibleItems = columns * maxVisibleRows;
         int startIndex = itemListRenderer.getScrollOffset() * columns;
-        
+
+        // Le rendu place les items a (ceiX + slide) pendant l'animation d'ouverture.
+        // Sans cet offset, on cliquait a cote de ce qui est affiche pendant 250 ms.
+        int animatedCeiX = (int) (ceiX + panelRenderer.getAnimationSlideOffset());
+
         for (int i = startIndex; i < Math.min(itemsToDisplay.size(), startIndex + maxVisibleItems); i++) {
             ItemStack stack = itemsToDisplay.get(i);
             int relativeIndex = i - startIndex;
-            int x = ceiX + GuiConstants.PADDING + (relativeIndex % columns) * GuiConstants.SLOT_SIZE;
+            int x = animatedCeiX + GuiConstants.PADDING + (relativeIndex % columns) * GuiConstants.SLOT_SIZE;
             int y = itemsListStartY + (relativeIndex / columns) * GuiConstants.SLOT_SIZE;
             if (GuiRenderHelper.isMouseOver((int) mouseX, (int) mouseY, x, y, GuiConstants.SLOT_SIZE, GuiConstants.SLOT_SIZE)) {
                 clickedItem = stack;
@@ -204,7 +217,7 @@ public class CeiModule {
             Minecraft client = Minecraft.getInstance();
             
             // PRIORITÉ 2: Si Shift est maintenu, toggle le favori
-            if (client != null && client.screen != null && 
+            if (client != null && com.ceketrum.cei.gui.util.CeiScreens.current() != null && 
                 com.ceketrum.cei.gui.util.CeiScreenHelper.hasShiftDown()) {
                 FavoriteItemsManager favoriteManager = FavoriteItemsManager.getInstance();
                 // Utiliser la méthode qui prend en compte les Data Components
@@ -219,8 +232,8 @@ public class CeiModule {
             }
             
             // PRIORITÉ 3: Si on est dans une table de craft, placer automatiquement les ingrédients
-            if (client != null && client.screen != null && 
-                client.screen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?> handledScreen) {
+            if (client != null && com.ceketrum.cei.gui.util.CeiScreens.current() != null && 
+                com.ceketrum.cei.gui.util.CeiScreens.current() instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?> handledScreen) {
                 
                 if (handledScreen.getMenu() instanceof net.minecraft.world.inventory.CraftingMenu craftingHandler) {
                     if (client.player != null) {
@@ -235,7 +248,7 @@ public class CeiModule {
                             if (recipe.getType() == net.minecraft.world.item.crafting.RecipeType.CRAFTING) {
                                 for (var display : recipe.display()) {
                                     ItemStack result = display.result().resolveForFirstStack(contextMap);
-                                    if (result != null && result.getItem() == clickedItem.getItem()) {
+                                    if (result != null && result.is(clickedItem.getItem())) {
                                         foundRecipe = recipe;
                                         break;
                                     }
@@ -266,8 +279,8 @@ public class CeiModule {
         // PRIORITÉ 4: Vérifier le clic sur le bouton paramètres
         if (panelRenderer.isSettingsButtonClicked((int) mouseX, (int) mouseY, ceiX, ceiY, ceiWidth)) {
             Minecraft client = Minecraft.getInstance();
-            if (client.screen != null) {
-                com.ceketrum.cei.gui.util.CeiScreenHelper.setScreen(client, new CeiConfigScreen(client.screen));
+            if (com.ceketrum.cei.gui.util.CeiScreens.current() != null) {
+                com.ceketrum.cei.gui.util.CeiScreens.set(new CeiConfigScreen(com.ceketrum.cei.gui.util.CeiScreens.current()));
             }
             return true;
         }
@@ -323,7 +336,7 @@ public class CeiModule {
         // Si la barre de recherche est focusée, intercepter TOUTES les touches (sauf Escape)
         if (panelRenderer.getSearchBar().isFocused()) {
             // Échap pour quitter le focus de la barre de recherche
-            if (keyCode == 256) { // GLFW_KEY_ESCAPE
+            if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.ESCAPE) { // GLFW_KEY_ESCAPE
                 panelRenderer.getSearchBar().setFocused(false);
                 return true;
             }
@@ -343,27 +356,33 @@ public class CeiModule {
      * Récupère tous les items du jeu, y compris les variantes avec Data Components.
      * Utilise un cache pour éviter de recréer la liste à chaque frame.
      */
-    private List<ItemStack> getAllItems() {
-        if (allItemsCache == null) {
-            allItemsCache = new ArrayList<>();
-            for (Item item : BuiltInRegistries.ITEM) {
-                try {
-                    // Utiliser ItemVariantGenerator pour générer toutes les variantes de l'item
-                    // Cela inclut les variantes avec Data Components (ex: potions avec différents effets)
-                    List<ItemStack> variants = com.ceketrum.cei.gui.module.cei.util.ItemVariantGenerator.generateItemVariants(item);
-                    for (ItemStack stack : variants) {
-                        // Vérifier si la stack est valide et non vide
-                        if (stack != null && !stack.isEmpty() && stack.getCount() > 0) {
-                            allItemsCache.add(stack);
-                        }
-                    }
-                } catch (Exception e) {
-                    // Si la génération échoue, ignorer cet item (ne devrait pas arriver normalement)
-                    // Cela peut arriver pour certains items avec des constructeurs spéciaux
+    /** Vide le cache partage. A appeler a la connexion / au rechargement des ressources. */
+    public static void invalidateItemCache() {
+        SHARED_ITEMS = null;
+        SHARED_BLOBS = null;
+    }
+
+    private static synchronized void ensureItemsBuilt() {
+        if (SHARED_ITEMS != null) return;
+
+        List<ItemStack> items = new ArrayList<>();
+        List<String> blobs = new ArrayList<>();
+        for (Item item : BuiltInRegistries.ITEM) {
+            try {
+                for (ItemStack stack : com.ceketrum.cei.gui.module.cei.util.ItemVariantGenerator.generateItemVariants(item)) {
+                    if (stack == null || stack.isEmpty() || stack.getCount() <= 0) continue;
+                    items.add(stack);
+                    // Index construit UNE fois : getHoverName() resout une traduction
+                    // et alloue, le refaire a chaque frappe coutait des milliers
+                    // d'allocations par caractere tape.
+                    blobs.add(com.ceketrum.cei.gui.module.cei.util.ItemFilter.buildSearchBlob(stack));
                 }
+            } catch (Exception e) {
+                // item au constructeur particulier : on l'ignore
             }
         }
-        return allItemsCache;
+        SHARED_BLOBS = blobs;
+        SHARED_ITEMS = items;
     }
     
     /**
@@ -373,22 +392,30 @@ public class CeiModule {
     private List<ItemStack> getFilteredItems() {
         String currentSearchText = panelRenderer.getSearchBar().getSearchText();
         boolean showFavoritesOnly = panelRenderer.isShowFavoritesOnly();
-        
-        if (filteredItemsCache == null || !currentSearchText.equals(lastSearchText)) {
-            List<ItemStack> allItems = getAllItems();
-            filteredItemsCache = ItemFilter.filterItems(allItems, currentSearchText);
-            
-            // Filtrer par favoris si nécessaire
-            if (showFavoritesOnly) {
-                FavoriteItemsManager favoriteManager = FavoriteItemsManager.getInstance();
-                filteredItemsCache = filteredItemsCache.stream()
-                    .filter(stack -> favoriteManager.isFavorite(stack))
-                    .collect(java.util.stream.Collectors.toList());
-            }
-            
-            lastSearchText = currentSearchText;
+
+        // La cle inclut le filtre favoris : sans lui, le cache ne se rafraichissait
+        // que grace a une invalidation manuelle depuis handleMouseClick.
+        if (filteredItemsCache != null
+                && currentSearchText.equals(lastSearchText)
+                && showFavoritesOnly == lastShowFavoritesOnly) {
+            return filteredItemsCache;
         }
-        
+
+        ensureItemsBuilt();
+        List<ItemStack> result = ItemFilter.filterIndexed(SHARED_ITEMS, SHARED_BLOBS, currentSearchText);
+
+        if (showFavoritesOnly) {
+            FavoriteItemsManager favoriteManager = FavoriteItemsManager.getInstance();
+            List<ItemStack> onlyFavorites = new ArrayList<>();
+            for (ItemStack stack : result) {
+                if (favoriteManager.isFavorite(stack)) onlyFavorites.add(stack);
+            }
+            result = onlyFavorites;
+        }
+
+        lastSearchText = currentSearchText;
+        lastShowFavoritesOnly = showFavoritesOnly;
+        filteredItemsCache = result;
         return filteredItemsCache;
     }
     

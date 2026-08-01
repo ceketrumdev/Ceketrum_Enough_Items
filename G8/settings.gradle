@@ -1,0 +1,18 @@
+// G8 est un build Gradle AUTONOME, volontairement absent du settings.gradle racine.
+// Minecraft 26.2 exige Loom 1.17 / Gradle 9.5.1 / Java 25, incompatibles avec la
+// toolchain de G1..G7 (Architectury Loom 1.14 / Gradle 9.2.1). Les melanger casserait
+// les six groupes qui fonctionnent.
+pluginManagement {
+    repositories {
+        maven { name = 'Fabric';       url = 'https://maven.fabricmc.net/' }
+        maven { name = 'NeoForged';    url = 'https://maven.neoforged.net/releases/' }
+        maven { name = 'Architectury'; url = 'https://maven.architectury.dev/' }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'cei-G8'
+
+include 'fabric'
+include 'neoforge'

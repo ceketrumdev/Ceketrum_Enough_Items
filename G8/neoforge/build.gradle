@@ -1,0 +1,49 @@
+plugins {
+    id 'net.neoforged.moddev'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = "${project.archives_base_name}-G8-neoforge"
+}
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    main {
+        java      { srcDirs = ["src/main/java",      "../common/src/main/java"] }
+        resources { srcDirs = ["src/main/resources", "../common/src/main/resources"] }
+    }
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(25)
+    withSourcesJar()
+}
+
+neoForge {
+    version = project.neoforge_version
+
+    mods {
+        cei {
+            sourceSet sourceSets.main
+        }
+    }
+
+    runs {
+        client { client() }
+    }
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching("META-INF/neoforge.mods.toml") { expand "version": inputs.properties.version }
+}
+
+tasks.withType(Copy).configureEach { duplicatesStrategy = DuplicatesStrategy.INCLUDE }
+tasks.withType(Jar).configureEach  { duplicatesStrategy = DuplicatesStrategy.INCLUDE }

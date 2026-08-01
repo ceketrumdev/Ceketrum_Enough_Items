@@ -12,15 +12,31 @@ import java.util.Set;
  * It activates 26.1 mixins on 26.1 (1.21-1.21.11) and 26.2 mixins on 26.2.
  */
 public class CeiMixinConfigPlugin implements IMixinConfigPlugin {
-    private static final boolean IS_26_2 = checkClassExists("net.minecraft.client.input.MouseButtonEvent");
+    // ATTENTION : ne jamais sonder net.minecraft.client.input.MouseButtonEvent.
+    // Cette classe existe deja en 1.21.11, donc la sonde renvoyait toujours true :
+    // tous les mixins ...261 etaient desactives et tous les ...262 actives, alors
+    // que leurs cibles (GuiGraphicsExtractor / extractRenderState) n'existent pas.
+    // Resultat : plus aucun mixin CEI ne s'appliquait sur G7.
+    // On sonde donc la classe reellement propre a 26.2.
+    private static final boolean IS_26_2 = checkClassExists("net.minecraft.client.gui.GuiGraphicsExtractor");
 
+    /**
+     * ATTENTION : ne JAMAIS utiliser Class.forName ici, meme avec initialize=false.
+     * La classe serait tout de meme chargee, pendant la phase de preparation des
+     * configs mixin -- donc avant que les autres mods aient pu appliquer leurs
+     * propres mixins dessus. fabric-rendering-v1 mixine GuiGraphicsExtractor et
+     * plantait avec MixinTargetAlreadyLoadedException a cause de ce sondage.
+     *
+     * On teste donc la presence de la RESSOURCE, ce qui n'entraine aucun
+     * chargement de classe.
+     */
     private static boolean checkClassExists(String className) {
-        try {
-            Class.forName(className, false, CeiMixinConfigPlugin.class.getClassLoader());
+        String resource = className.replace('.', '/') + ".class";
+        ClassLoader loader = CeiMixinConfigPlugin.class.getClassLoader();
+        if (loader != null && loader.getResource(resource) != null) {
             return true;
-        } catch (ClassNotFoundException e) {
-            return false;
         }
+        return ClassLoader.getSystemResource(resource) != null;
     }
 
     @Override

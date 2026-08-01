@@ -29,12 +29,21 @@ public abstract class CeiScreenInjectionMixin extends Screen {
     
     // require=0: les intermédiaires Fabric changent entre les sous-versions 1.21.x,
     // cette annotation permet au mod de charger même si la méthode n'est pas trouvée.
+    @Unique
+    private boolean cei$hasRecipeBook() {
+        return (Object)this instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen || (Object)this instanceof net.minecraft.client.gui.screens.inventory.CraftingScreen || (Object)this instanceof net.minecraft.client.gui.screens.inventory.AbstractFurnaceScreen;
+    }
+
     @Inject(
         method = "render",
         at = @At("TAIL"),
         require = 0
     )
     private void cei$render(GuiGraphics context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        if (cei$hasRecipeBook()) {
+            return;
+        }
+
         if (!cei$isValidScreen()) {
             return;
         }
@@ -105,6 +114,10 @@ public abstract class CeiScreenInjectionMixin extends Screen {
         require = 0
     )
     private void cei$mouseClicked(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+        if (cei$hasRecipeBook()) {
+            return;
+        }
+
         if (!cei$isValidScreen()) {
             return;
         }

@@ -1,7 +1,7 @@
 package com.ceketrum.cei.gui.module.cei.components;
 
 import com.ceketrum.cei.gui.constants.GuiConstants;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -21,11 +21,11 @@ public class SearchBar {
     /**
      * Rend la barre de recherche.
      */
-    public void render(Object context, int x, int y, int width, net.minecraft.client.gui.Font textRenderer) {
+    public void render(GuiGraphicsExtractor context, int x, int y, int width, net.minecraft.client.gui.Font textRenderer) {
         // Fond de la barre de recherche
         int backgroundColor = isFocused ? 0xFF2C2C2C : 0xFF1E1E1E;
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, x, y, x + width, y + SEARCH_BAR_HEIGHT, backgroundColor);
-        com.ceketrum.cei.gui.util.CeiGraphics.renderOutline(context, x, y, width, SEARCH_BAR_HEIGHT, isFocused ? 0xFFFFFFFF : 0xFF808080);
+        context.fill(x, y, x + width, y + SEARCH_BAR_HEIGHT, backgroundColor);
+        context.outline(x, y, width, SEARCH_BAR_HEIGHT, isFocused ? 0xFFFFFFFF : 0xFF808080);
         
         // Texte de recherche
         int textX = x + SEARCH_BAR_PADDING;
@@ -41,14 +41,14 @@ public class SearchBar {
             }
         }
         
-        com.ceketrum.cei.gui.util.CeiGraphics.drawString(context, textRenderer, Component.literal(displayText), textX, textY, 0xFFFFFFFF, false);
+        context.text(textRenderer, Component.literal(displayText), textX, textY, 0xFFFFFFFF, false);
         
         // Curseur si la barre est focusée
         if (isFocused) {
             updateCursorBlink();
             if (cursorVisible) {
                 int cursorX = textX + textRenderer.width(displayText);
-                com.ceketrum.cei.gui.util.CeiGraphics.fill(context, cursorX, textY, cursorX + 1, textY + textRenderer.lineHeight, 0xFFFFFFFF);
+                context.fill(cursorX, textY, cursorX + 1, textY + textRenderer.lineHeight, 0xFFFFFFFF);
             }
         }
     }
@@ -93,7 +93,7 @@ public class SearchBar {
         }
         
         // Backspace
-        if (keyCode == 259) { // GLFW_KEY_BACKSPACE
+        if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.BACKSPACE) { // GLFW_KEY_BACKSPACE
             if (cursorPosition > 0) {
                 searchText = searchText.substring(0, cursorPosition - 1) + searchText.substring(cursorPosition);
                 cursorPosition--;
@@ -102,7 +102,7 @@ public class SearchBar {
             }
         }
         // Delete
-        else if (keyCode == 261) { // GLFW_KEY_DELETE
+        else if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.DELETE) { // GLFW_KEY_DELETE
             if (cursorPosition < searchText.length()) {
                 searchText = searchText.substring(0, cursorPosition) + searchText.substring(cursorPosition + 1);
                 resetCursorBlink();
@@ -110,7 +110,7 @@ public class SearchBar {
             }
         }
         // Flèche gauche
-        else if (keyCode == 263) { // GLFW_KEY_LEFT
+        else if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.LEFT) { // GLFW_KEY_LEFT
             if (cursorPosition > 0) {
                 cursorPosition--;
                 resetCursorBlink();
@@ -118,7 +118,7 @@ public class SearchBar {
             }
         }
         // Flèche droite
-        else if (keyCode == 262) { // GLFW_KEY_RIGHT
+        else if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.RIGHT) { // GLFW_KEY_RIGHT
             if (cursorPosition < searchText.length()) {
                 cursorPosition++;
                 resetCursorBlink();
@@ -126,13 +126,13 @@ public class SearchBar {
             }
         }
         // Début de ligne
-        else if (keyCode == 268) { // GLFW_KEY_HOME
+        else if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.HOME) { // GLFW_KEY_HOME
             cursorPosition = 0;
             resetCursorBlink();
             return true;
         }
         // Fin de ligne
-        else if (keyCode == 269) { // GLFW_KEY_END
+        else if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.END) { // GLFW_KEY_END
             cursorPosition = searchText.length();
             resetCursorBlink();
             return true;

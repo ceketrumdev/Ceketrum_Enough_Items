@@ -9,7 +9,6 @@ import java.lang.reflect.Method;
 import com.ceketrum.cei.gui.constants.GuiConstants;
 import com.ceketrum.cei.gui.util.GuiRenderHelper;
 import com.ceketrum.cei.gui.util.TextRenderHelper;
-import com.ceketrum.cei.gui.util.CeiScreenHelper;
 import com.ceketrum.cei.gui.module.cei.components.RecipePopupRenderer;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -17,7 +16,7 @@ import java.util.List;
 import java.util.Set;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -236,7 +235,7 @@ public class CeiItemInfoScreen extends Screen {
                 boolean producesItem = false;
                 for (var display : recipe.display()) {
                     ItemStack result = display.result().resolveForFirstStack(contextMap);
-                    if (result != null && result.getItem() == targetStack.getItem()) {
+                    if (result != null && result.is(targetStack.getItem())) {
                         producesItem = true;
                         break;
                     }
@@ -245,7 +244,7 @@ public class CeiItemInfoScreen extends Screen {
                     // Try our omniscient custom outputs extractor!
                     List<ItemStack> customOutputs = extractCustomOutputs(recipe, contextMap);
                     for (ItemStack out : customOutputs) {
-                        if (out.getItem() == targetStack.getItem()) {
+                        if (out.is(targetStack.getItem())) {
                             producesItem = true;
                             break;
                         }
@@ -264,7 +263,7 @@ public class CeiItemInfoScreen extends Screen {
                     if (inputSlot != null) {
                         List<ItemStack> stacks = inputSlot.resolveForStacks(contextMap);
                         for (ItemStack stack : stacks) {
-                            if (stack.getItem() == targetStack.getItem()) {
+                            if (stack.is(targetStack.getItem())) {
                                 isInput = true;
                                 break;
                             }
@@ -279,7 +278,7 @@ public class CeiItemInfoScreen extends Screen {
                 // Try our omniscient custom inputs extractor!
                 List<ItemStack> customInputs = extractCustomInputs(recipe, contextMap);
                 for (ItemStack in : customInputs) {
-                    if (in.getItem() == targetStack.getItem()) {
+                    if (in.is(targetStack.getItem())) {
                         isInput = true;
                         break;
                     }
@@ -419,21 +418,12 @@ public class CeiItemInfoScreen extends Screen {
     }
     
     @Override
-    public void renderBackground(GuiGraphics context, int mouseX, int mouseY, float delta) {
-        // Overridden to do nothing to prevent super.render() from drawing the background/blur shader on top of our GUI!
+    public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        // Overridden to do nothing to prevent super.extractRenderState() from drawing the background/blur shader on top of our GUI!
     }
 
     @Override
-    public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
-        renderImpl(context, mouseX, mouseY, delta);
-        super.render(context, mouseX, mouseY, delta);
-    }
-
-    public void extractRenderState(Object context, int mouseX, int mouseY, float delta) {
-        renderImpl(context, mouseX, mouseY, delta);
-    }
-
-    public void renderImpl(Object context, int mouseX, int mouseY, float delta) {
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
         var card = manager.getPinnedCard(this.targetStack);
         int currentXOffset = card != null ? (int) card.getxOffset() : 0;
@@ -442,42 +432,53 @@ public class CeiItemInfoScreen extends Screen {
         this.containerX = (this.width - this.containerWidth) / 2 + currentXOffset;
         this.containerY = (this.height - this.containerHeight) / 2 + currentYOffset;
         
-        if (CeiScreenHelper.getCurrentScreen(this.minecraft) == this) {
-            com.ceketrum.cei.gui.util.CeiGraphics.fill(context, 0, 0, this.width, this.height, 0x90000000);
+        // 1. Draw the native background blur shader and dimming first (flouts the world cleanly in the background)
+        // ONLY if this is the active current screen (not rendered as an overlay on top of inventory!)
+        if (com.ceketrum.cei.gui.util.CeiScreens.current() == this) {
+            super.extractBackground(context, mouseX, mouseY, delta);
         }
         
         this.currentOpacity = card != null ? card.getOpacity() : 1.0f;
         float currentOpacity = this.currentOpacity;
         
+        // Draw background shadow
         int shadowColor = applyOpacity(0x80000000, currentOpacity);
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, containerX + 3, containerY + 3, containerX + containerWidth + 3, containerY + containerHeight + 3, shadowColor);
+        context.fill(containerX + 3, containerY + 3, containerX + containerWidth + 3, containerY + containerHeight + 3, shadowColor);
         
+        // Draw Main & Category Tab backgrounds FIRST (drawn behind the main container border/bg)
         drawMainTabsBackground(context, mouseX, mouseY, currentOpacity);
         drawCategoryTabsBackground(context, mouseX, mouseY, currentOpacity);
         
-        int bgColor = applyOpacity(0xD9101010, currentOpacity);
+        int bgColor = applyOpacity(0xD9101010, currentOpacity); // Dark premium glass
         GuiRenderHelper.drawRoundedBackground(context, containerX, containerY, containerWidth, containerHeight, 12, bgColor);
-        int borderColor = applyOpacity(0x33FFFFFF, currentOpacity);
-        com.ceketrum.cei.gui.util.CeiGraphics.renderOutline(context, containerX, containerY, containerWidth, containerHeight, borderColor);
+        int borderColor = applyOpacity(0x33FFFFFF, currentOpacity); // glowing silver border
+        context.outline(containerX, containerY, containerWidth, containerHeight, borderColor);
         
+        // Draw Title (Target Item Name)
         String titleText = targetStack.getHoverName().getString();
-        String truncatedTitle = TextRenderHelper.truncateText(titleText, containerWidth - 60, this.font);
+        String truncatedTitle = TextRenderHelper.truncateText(titleText, containerWidth - 60, this.font); // left space for header buttons
         int titleWidth = this.font.width(truncatedTitle);
-        com.ceketrum.cei.gui.util.CeiGraphics.drawString(context, this.font, Component.literal(truncatedTitle).withStyle(ChatFormatting.GOLD),
+        context.text(this.font, Component.literal(truncatedTitle).withStyle(ChatFormatting.GOLD),
                         containerX + (containerWidth - titleWidth) / 2, containerY + 8, applyOpacity(0xFFFFFFFF, currentOpacity), false);
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, containerX + 10, containerY + 20, containerX + containerWidth - 10, containerY + 21, applyOpacity(0x22FFFFFF, currentOpacity));
+        context.fill(containerX + 10, containerY + 20, containerX + containerWidth - 10, containerY + 21, applyOpacity(0x22FFFFFF, currentOpacity));
         
+        // Draw Header Action Buttons (Pin, HUD, Opacity)
         drawHeaderButtons(context, mouseX, mouseY);
         
+        // Reset active slots for hover detection
         activeSlots.clear();
         hoveredSlot = null;
         
+        // Draw Tab Icons on top
         drawMainTabsIcons(context);
         drawCategoryTabsIcons(context);
         
+        // Draw Tab Content
         drawTabContent(context, mouseX, mouseY);
         
-        if (this.ceiModule != null && CeiScreenHelper.getCurrentScreen(this.minecraft) == this) {
+        // Render the CEI Search Panel and Item list on the side (NOT blurred!)
+        // ONLY if this is the active current screen (do not render list if overlay!)
+        if (this.ceiModule != null && com.ceketrum.cei.gui.util.CeiScreens.current() == this) {
             this.ceiModule.render(
                 context, 
                 mouseX, 
@@ -490,44 +491,53 @@ public class CeiItemInfoScreen extends Screen {
             );
         }
         
+        // Draw Tooltips (Hovered slot or Tab icons)
         drawTooltips(context, mouseX, mouseY);
+        
+        super.extractRenderState(context, mouseX, mouseY, delta);
     }
     
-    private void drawHeaderButtons(Object context, int mouseX, int mouseY) {
+    private void drawHeaderButtons(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
         var card = manager.getPinnedCard(this.targetStack);
         boolean isPinned = card != null;
         
+        // 1. PIN button
         int pinX = containerX + 6;
         int pinY = containerY + 5;
         boolean hoverPin = mouseX >= pinX && mouseX < pinX + 12 && mouseY >= pinY && mouseY < pinY + 12;
-        int pinBg = hoverPin ? 0x66FFFFFF : (isPinned ? 0xAAFFD700 : 0x22FFFFFF);
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, pinX, pinY, pinX + 12, pinY + 12, pinBg);
-        com.ceketrum.cei.gui.util.CeiGraphics.renderOutline(context, pinX, pinY, 12, 12, isPinned ? 0xFFFFD700 : 0x44FFFFFF);
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, pinX + 5, pinY + 3, pinX + 7, pinY + 9, 0xFFFFFFFF);
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, pinX + 3, pinY + 5, pinX + 9, pinY + 7, 0xFFFFFFFF);
+        int pinBg = hoverPin ? 0x66FFFFFF : (isPinned ? 0xAAFFD700 : 0x22FFFFFF); // Golden color if pinned!
+        context.fill(pinX, pinY, pinX + 12, pinY + 12, pinBg);
+        context.outline(pinX, pinY, 12, 12, isPinned ? 0xFFFFD700 : 0x44FFFFFF);
+        // Draw a small anchor/pin dot in the center
+        context.fill(pinX + 5, pinY + 3, pinX + 7, pinY + 9, 0xFFFFFFFF);
+        context.fill(pinX + 3, pinY + 5, pinX + 9, pinY + 7, 0xFFFFFFFF);
         
         if (isPinned) {
+            // 2. HUD button
             int hudX = containerX + 20;
             int hudY = containerY + 5;
             boolean showInHud = card.isShowInHud();
             boolean hoverHud = mouseX >= hudX && mouseX < hudX + 12 && mouseY >= hudY && mouseY < hudY + 12;
-            int hudBg = hoverHud ? 0x66FFFFFF : (showInHud ? 0xAA00FF00 : 0x22FFFFFF);
-            com.ceketrum.cei.gui.util.CeiGraphics.fill(context, hudX, hudY, hudX + 12, hudY + 12, hudBg);
-            com.ceketrum.cei.gui.util.CeiGraphics.renderOutline(context, hudX, hudY, 12, 12, showInHud ? 0xFF00FF00 : 0x44FFFFFF);
-            com.ceketrum.cei.gui.util.CeiGraphics.fill(context, hudX + 3, hudY + 5, hudX + 9, hudY + 7, 0xFFFFFFFF);
-            com.ceketrum.cei.gui.util.CeiGraphics.fill(context, hudX + 5, hudY + 4, hudX + 7, hudY + 8, 0xFFFFFFFF);
+            int hudBg = hoverHud ? 0x66FFFFFF : (showInHud ? 0xAA00FF00 : 0x22FFFFFF); // Green color if active!
+            context.fill(hudX, hudY, hudX + 12, hudY + 12, hudBg);
+            context.outline(hudX, hudY, 12, 12, showInHud ? 0xFF00FF00 : 0x44FFFFFF);
+            // Draw a small eye (horizontal line + center dot)
+            context.fill(hudX + 3, hudY + 5, hudX + 9, hudY + 7, 0xFFFFFFFF);
+            context.fill(hudX + 5, hudY + 4, hudX + 7, hudY + 8, 0xFFFFFFFF);
             
+            // 3. OPACITY button
             int opX = containerX + 34;
             int opY = containerY + 5;
             float opacity = card.getOpacity();
             boolean hoverOp = mouseX >= opX && mouseX < opX + 12 && mouseY >= opY && mouseY < opY + 12;
             int opBg = hoverOp ? 0x66FFFFFF : 0x22FFFFFF;
-            com.ceketrum.cei.gui.util.CeiGraphics.fill(context, opX, opY, opX + 12, opY + 12, opBg);
-            com.ceketrum.cei.gui.util.CeiGraphics.renderOutline(context, opX, opY, 12, 12, 0x44FFFFFF);
+            context.fill(opX, opY, opX + 12, opY + 12, opBg);
+            context.outline(opX, opY, 12, 12, 0x44FFFFFF);
+            // Draw small columns or dots representing transparency level
             int dotCount = opacity == 1.0f ? 4 : (opacity == 0.75f ? 3 : (opacity == 0.5f ? 2 : 1));
             for (int d = 0; d < dotCount; d++) {
-                com.ceketrum.cei.gui.util.CeiGraphics.fill(context, opX + 2 + d * 2, opY + 3, opX + 3 + d * 2, opY + 9, 0xFFFFFFFF);
+                context.fill(opX + 2 + d * 2, opY + 3, opX + 3 + d * 2, opY + 9, 0xFFFFFFFF);
             }
         }
     }
@@ -538,7 +548,7 @@ public class CeiItemInfoScreen extends Screen {
         return (a << 24) | (color & 0x00FFFFFF);
     }
     
-    private void drawMainTabsBackground(Object context, int mouseX, int mouseY, float opacity) {
+    private void drawMainTabsBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float opacity) {
         for (int i = 0; i < visibleMainTabs.size(); i++) {
             TabType tab = visibleMainTabs.get(i);
             int tabX = containerX + containerWidth - 3;
@@ -549,11 +559,11 @@ public class CeiItemInfoScreen extends Screen {
             
             int tabBg = applyOpacity(active ? 0xD9222222 : (hovered ? 0xAA2D2D2D : 0xD9141414), opacity);
             GuiRenderHelper.drawRoundedBackground(context, tabX, tabY, 27, 22, 6, tabBg);
-            com.ceketrum.cei.gui.util.CeiGraphics.renderOutline(context, tabX, tabY, 27, 22, applyOpacity(active ? 0x66FFFFFF : 0x22FFFFFF, opacity));
+            context.outline(tabX, tabY, 27, 22, applyOpacity(active ? 0x66FFFFFF : 0x22FFFFFF, opacity));
         }
     }
     
-    private void drawMainTabsIcons(Object context) {
+    private void drawMainTabsIcons(GuiGraphicsExtractor context) {
         for (int i = 0; i < visibleMainTabs.size(); i++) {
             TabType tab = visibleMainTabs.get(i);
             int tabX = containerX + containerWidth - 3;
@@ -567,11 +577,11 @@ public class CeiItemInfoScreen extends Screen {
                 case WORLD -> new ItemStack(Items.COMPASS);
             };
             
-            com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, iconStack, tabX + 6, tabY + 3);
+            context.item(iconStack, tabX + 6, tabY + 3);
         }
     }
     
-    private void drawCategoryTabsBackground(Object context, int mouseX, int mouseY, float opacity) {
+    private void drawCategoryTabsBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float opacity) {
         if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
         
         for (int i = 0; i < categories.size(); i++) {
@@ -584,11 +594,11 @@ public class CeiItemInfoScreen extends Screen {
             
             int tabBg = applyOpacity(active ? 0xD9222222 : (hovered ? 0xAA2D2D2D : 0xD9141414), opacity);
             GuiRenderHelper.drawRoundedBackground(context, tabX, tabY, 27, 22, 6, tabBg);
-            com.ceketrum.cei.gui.util.CeiGraphics.renderOutline(context, tabX, tabY, 27, 22, applyOpacity(active ? 0x66FFFFFF : 0x22FFFFFF, opacity));
+            context.outline(tabX, tabY, 27, 22, applyOpacity(active ? 0x66FFFFFF : 0x22FFFFFF, opacity));
         }
     }
     
-    private void drawCategoryTabsIcons(Object context) {
+    private void drawCategoryTabsIcons(GuiGraphicsExtractor context) {
         if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
         
         for (int i = 0; i < categories.size(); i++) {
@@ -623,11 +633,11 @@ public class CeiItemInfoScreen extends Screen {
                 }
             };
             
-            com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, iconStack, tabX + 4, tabY + 3);
+            context.item(iconStack, tabX + 4, tabY + 3);
         }
     }
     
-    private void drawTabContent(Object context, int mouseX, int mouseY) {
+    private void drawTabContent(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         int contentX = containerX + 15;
         int contentY = containerY + 28;
         int contentWidth = containerWidth - 30;
@@ -643,6 +653,7 @@ public class CeiItemInfoScreen extends Screen {
                     desc = isFr ? "Aucune description disponible pour cet item." : "No description available for this item.";
                 }
                 
+                // Real stats integration in description tab
                 RecipePopupRenderer.ItemStats stats = new RecipePopupRenderer().getItemStats(targetStack);
                 boolean hasAnyStats = stats.hasDurability || stats.hasFood || stats.hasAttackDamage || stats.hasAttackSpeed || stats.hasArmor || stats.hasToughness;
                 
@@ -650,11 +661,11 @@ public class CeiItemInfoScreen extends Screen {
                 
                 if (hasAnyStats) {
                     currY += 6;
-                    com.ceketrum.cei.gui.util.CeiGraphics.fill(context, contentX, currY, contentX + contentWidth, currY + 1, 0x22FFFFFF);
+                    context.fill(contentX, currY, contentX + contentWidth, currY + 1, 0x22FFFFFF);
                     currY += 6;
                     
                     String statsTitle = isFr ? "Statistiques :" : "Statistics:";
-                    com.ceketrum.cei.gui.util.CeiGraphics.drawString(context, this.font, Component.literal(statsTitle), contentX, currY, 0xFFFFD700, false);
+                    context.text(this.font, statsTitle, contentX, currY, 0xFFFFD700, false);
                     currY += 11;
                     
                     int statColor = 0xAAAAAAAA;
@@ -694,7 +705,7 @@ public class CeiItemInfoScreen extends Screen {
                     String emptyMsg = isFr ? (activeMainTab == TabType.CRAFTING ? "Aucune recette de craft." : "Aucun usage de craft.")
                                            : (activeMainTab == TabType.CRAFTING ? "No recipes found." : "No usages found.");
                     int msgW = this.font.width(emptyMsg);
-                    com.ceketrum.cei.gui.util.CeiGraphics.drawString(context, this.font, Component.literal(emptyMsg), contentX + (contentWidth - msgW) / 2, contentY + 40, 0xFFFF0000, false);
+                    context.text(this.font, emptyMsg, contentX + (contentWidth - msgW) / 2, contentY + 40, 0xFFFF0000, false);
                 } else {
                     drawRecipeContent(context, mouseX, mouseY, contentX, contentY, contentWidth, contentHeight, isFr);
                 }
@@ -703,7 +714,7 @@ public class CeiItemInfoScreen extends Screen {
             case LOOT: {
                 List<String> lootSources = LootTableSourceManager.getInstance().getSourcesForItem(targetStack.getItem());
                 String header = isFr ? "Sources d'Obtention :" : "Obtaining Sources:";
-                com.ceketrum.cei.gui.util.CeiGraphics.drawString(context, this.font, Component.literal(header), contentX, contentY, 0xFFFFD700, false);
+                context.text(this.font, header, contentX, contentY, 0xFFFFD700, false);
                 int currY = contentY + 14;
                 
                 for (String source : lootSources) {
@@ -714,9 +725,11 @@ public class CeiItemInfoScreen extends Screen {
             case WORLD: {
                 List<String> locations = new ArrayList<>(LootTableSourceManager.getInstance().getWorldLocationsForItem(targetStack.getItem()));
                 
+                // Add natural block generation details!
                 List<String> blockGenSources = BlockGenerationManager.getInstance().getBlockGenerationSources(targetStack.getItem());
                 locations.addAll(blockGenSources);
                 
+                // Remove duplicates and placeholders
                 Set<String> uniqueLocs = new LinkedHashSet<>();
                 String placeholderFr = "Partout dans le monde / Non spécifié";
                 String placeholderEn = "Everywhere / Not specified";
@@ -732,7 +745,7 @@ public class CeiItemInfoScreen extends Screen {
                 }
                 
                 String header = isFr ? "Biomes et Structures :" : "Biomes and Structures:";
-                com.ceketrum.cei.gui.util.CeiGraphics.drawString(context, this.font, Component.literal(header), contentX, contentY, 0xFFFFD700, false);
+                context.text(this.font, header, contentX, contentY, 0xFFFFD700, false);
                 int currY = contentY + 14;
                 
                 for (String location : uniqueLocs) {
@@ -743,7 +756,7 @@ public class CeiItemInfoScreen extends Screen {
         }
     }
     
-    private void drawRecipeContent(Object context, int mouseX, int mouseY, int contentX, int contentY, int contentWidth, int contentHeight, boolean isFr) {
+    private void drawRecipeContent(GuiGraphicsExtractor context, int mouseX, int mouseY, int contentX, int contentY, int contentWidth, int contentHeight, boolean isFr) {
         List<?> list = getActiveRecipesList();
         if (currentPage >= list.size()) currentPage = 0;
         Object recipeObj = list.get(currentPage);
@@ -752,6 +765,7 @@ public class CeiItemInfoScreen extends Screen {
         var rm = client.level.registryAccess();
         var contextMap = net.minecraft.world.item.crafting.display.SlotDisplayContext.fromLevel(client.level);
         
+        // Draw Header of recipe
         Recipe<?> activeRecipe = null;
         if (recipeObj instanceof RecipeHolder<?> entry) {
             activeRecipe = entry.value();
@@ -774,17 +788,21 @@ public class CeiItemInfoScreen extends Screen {
             case STONECUTTING -> isFr ? "Tailleur de Pierre" : "Stonecutter";
             case SMITHING -> isFr ? "Table de Forgeron" : "Smithing Table";
             case CUSTOM -> {
-                if (titleIcon.getItem() == Items.DISPENSER) {
-                    yield isFr ? "Machine Spéciale" : "Custom Machine";
+                // Le libelle vient desormais du type de recette lui-meme :
+                // create:crushing doit s'afficher "Crushing Wheel", pas
+                // "Custom Machine". Cf. CeiRecipeStation.
+                if (finalRecipe != null) {
+                    yield getMachineLabel(finalRecipe, isFr);
                 }
-                yield titleIcon.getHoverName().getString();
+                yield isFr ? "Machine Spéciale" : "Custom Machine";
             }
         };
         
-        com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, titleIcon, contentX, contentY - 4);
+        context.item(titleIcon, contentX, contentY - 4);
         activeSlots.add(new RenderedSlot(titleIcon, contentX, contentY - 4, 16));
-        com.ceketrum.cei.gui.util.CeiGraphics.drawString(context, this.font, Component.literal(catName), contentX + 20, contentY, 0xFFFFD700, false);
+        context.text(this.font, catName, contentX + 20, contentY, 0xFFFFD700, false);
         
+        // Render slots and arrow based on category
         switch (activeCategory.type) {
             case CRAFTING: {
                 RecipeHolder<?> entry = (RecipeHolder<?>) recipeObj;
@@ -794,11 +812,13 @@ public class CeiItemInfoScreen extends Screen {
                 int gridStartX = contentX + 10;
                 int gridStartY = contentY + 18;
                 
+                // Draw 3x3 slots
                 for (int r = 0; r < 3; r++) {
                     for (int c = 0; c < 3; c++) {
                         int slotX = gridStartX + c * 20;
                         int slotY = gridStartY + r * 20;
                         
+                        // Draw slot border & bg
                         drawSlotBg(context, slotX, slotY);
                         
                         ItemStack inputStack = ItemStack.EMPTY;
@@ -807,33 +827,38 @@ public class CeiItemInfoScreen extends Screen {
                         }
                         
                         if (inputStack != null && !inputStack.isEmpty()) {
-                            com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, inputStack, slotX + 1, slotY + 1);
+                            context.item(inputStack, slotX + 1, slotY + 1);
                             activeSlots.add(new RenderedSlot(inputStack, slotX, slotY, 18));
                         }
                     }
                 }
                 
+                // Arrow
                 int arrowX = gridStartX + 65;
                 int arrowY = gridStartY + 22;
                 drawArrow(context, arrowX, arrowY);
                 
+                // Plus button for crafting table auto-transfer
                 if (isParentCraftingTable()) {
                     int plusX = arrowX + 3;
                     int plusY = arrowY + 12;
                     
                     boolean hoverPlus = mouseX >= plusX && mouseX < plusX + 12 && mouseY >= plusY && mouseY < plusY + 12;
                     
+                    // Draw sleek button background
                     int btnBg = hoverPlus ? 0xFF3D3D3D : 0xFF1C1C1C;
                     int btnBorder = hoverPlus ? 0x88FFFFFF : 0x33FFFFFF;
                     
-                    com.ceketrum.cei.gui.util.CeiGraphics.fill(context, plusX, plusY, plusX + 12, plusY + 12, btnBg);
-                    com.ceketrum.cei.gui.util.CeiGraphics.renderOutline(context, plusX, plusY, 12, 12, btnBorder);
+                    context.fill(plusX, plusY, plusX + 12, plusY + 12, btnBg);
+                    context.outline(plusX, plusY, 12, 12, btnBorder);
                     
+                    // Draw horizontal and vertical lines of the "+" sign
                     int textColor = hoverPlus ? 0xFFFFFFFF : 0xFFAAAAAA;
-                    com.ceketrum.cei.gui.util.CeiGraphics.fill(context, plusX + 3, plusY + 5, plusX + 9, plusY + 7, textColor);
-                    com.ceketrum.cei.gui.util.CeiGraphics.fill(context, plusX + 5, plusY + 3, plusX + 7, plusY + 9, textColor);
+                    context.fill(plusX + 3, plusY + 5, plusX + 9, plusY + 7, textColor);
+                    context.fill(plusX + 5, plusY + 3, plusX + 7, plusY + 9, textColor);
                 }
                 
+                // Output slot
                 int outputX = gridStartX + 100;
                 int outputY = gridStartY + 18;
                 drawSlotBg(context, outputX, outputY);
@@ -843,7 +868,7 @@ public class CeiItemInfoScreen extends Screen {
                     if (!displays.isEmpty()) {
                         outStack = displays.get(0).result().resolveForFirstStack(contextMap);
                     }
-                    com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, outStack, outputX + 1, outputY + 1);
+                    context.item(outStack, outputX + 1, outputY + 1);
                     activeSlots.add(new RenderedSlot(outStack, outputX, outputY, 18));
                 } catch (Exception e) {}
                 break;
@@ -855,18 +880,21 @@ public class CeiItemInfoScreen extends Screen {
                 int slotX = contentX + 25;
                 int slotY = contentY + 28;
                 
+                // Input slot
                 drawSlotBg(context, slotX, slotY);
                 List<RecipeDisplay> displays = recipe.display();
                 if (!displays.isEmpty() && displays.get(0) instanceof net.minecraft.world.item.crafting.display.FurnaceRecipeDisplay furnace) {
                     ItemStack inStack = furnace.ingredient().resolveForFirstStack(contextMap);
                     if (inStack != null && !inStack.isEmpty()) {
-                        com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, inStack, slotX + 1, slotY + 1);
+                        context.item(inStack, slotX + 1, slotY + 1);
                         activeSlots.add(new RenderedSlot(inStack, slotX, slotY, 18));
                     }
                 }
                 
+                // Flame/Arrow
                 drawArrow(context, slotX + 30, slotY + 2);
                 
+                // Output slot
                 int outX = slotX + 65;
                 drawSlotBg(context, outX, slotY);
                 try {
@@ -874,7 +902,7 @@ public class CeiItemInfoScreen extends Screen {
                     if (!displays.isEmpty()) {
                         outStack = displays.get(0).result().resolveForFirstStack(contextMap);
                     }
-                    com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, outStack, outX + 1, slotY + 1);
+                    context.item(outStack, outX + 1, slotY + 1);
                     activeSlots.add(new RenderedSlot(outStack, outX, slotY, 18));
                 } catch (Exception e) {}
                 break;
@@ -885,25 +913,30 @@ public class CeiItemInfoScreen extends Screen {
                 int gridStartX = contentX + 25;
                 int gridStartY = contentY + 14;
                 
+                // Ingredient (top slot)
                 int ingX = gridStartX + 25;
                 int ingY = gridStartY;
                 drawSlotBg(context, ingX, ingY);
-                com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, recipe.ingredient, ingX + 1, ingY + 1);
+                context.item(recipe.ingredient, ingX + 1, ingY + 1);
                 activeSlots.add(new RenderedSlot(recipe.ingredient, ingX, ingY, 18));
                 
-                com.ceketrum.cei.gui.util.CeiGraphics.fill(context, ingX + 8, ingY + 21, ingX + 10, ingY + 36, 0x66FFFFFF);
-                com.ceketrum.cei.gui.util.CeiGraphics.fill(context, ingX + 6, ingY + 33, ingX + 12, ingY + 35, 0x66FFFFFF);
+                // Arrow pointing down
+                context.fill(ingX + 8, ingY + 21, ingX + 10, ingY + 36, 0x66FFFFFF);
+                context.fill(ingX + 6, ingY + 33, ingX + 12, ingY + 35, 0x66FFFFFF);
                 
+                // Potions (bottom slots)
                 int potY = gridStartY + 40;
                 
+                // Input potion (left)
                 int leftX = gridStartX;
                 drawSlotBg(context, leftX, potY);
-                com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, recipe.inputPotion, leftX + 1, potY + 1);
+                context.item(recipe.inputPotion, leftX + 1, potY + 1);
                 activeSlots.add(new RenderedSlot(recipe.inputPotion, leftX, potY, 18));
                 
+                // Output potion (right)
                 int rightX = gridStartX + 50;
                 drawSlotBg(context, rightX, potY);
-                com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, recipe.outputPotion, rightX + 1, potY + 1);
+                context.item(recipe.outputPotion, rightX + 1, potY + 1);
                 activeSlots.add(new RenderedSlot(recipe.outputPotion, rightX, potY, 18));
                 break;
             }
@@ -914,18 +947,21 @@ public class CeiItemInfoScreen extends Screen {
                 int slotX = contentX + 25;
                 int slotY = contentY + 28;
                 
+                // Input
                 drawSlotBg(context, slotX, slotY);
                 List<RecipeDisplay> displays = recipe.display();
                 if (!displays.isEmpty() && displays.get(0) instanceof net.minecraft.world.item.crafting.display.StonecutterRecipeDisplay stonecutter) {
                     ItemStack inStack = stonecutter.input().resolveForFirstStack(contextMap);
                     if (inStack != null && !inStack.isEmpty()) {
-                        com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, inStack, slotX + 1, slotY + 1);
+                        context.item(inStack, slotX + 1, slotY + 1);
                         activeSlots.add(new RenderedSlot(inStack, slotX, slotY, 18));
                     }
                 }
                 
+                // Arrow
                 drawArrow(context, slotX + 30, slotY + 2);
                 
+                // Output
                 int outX = slotX + 65;
                 drawSlotBg(context, outX, slotY);
                 try {
@@ -933,7 +969,7 @@ public class CeiItemInfoScreen extends Screen {
                     if (!displays.isEmpty()) {
                         outStack = displays.get(0).result().resolveForFirstStack(contextMap);
                     }
-                    com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, outStack, outX + 1, slotY + 1);
+                    context.item(outStack, outX + 1, slotY + 1);
                     activeSlots.add(new RenderedSlot(outStack, outX, slotY, 18));
                 } catch (Exception e) {}
                 break;
@@ -945,6 +981,7 @@ public class CeiItemInfoScreen extends Screen {
                 int slotX = contentX + 10;
                 int slotY = contentY + 28;
                 
+                // 3 Inputs (Template, Base, Addition)
                 List<RecipeDisplay> displays = recipe.display();
                 if (!displays.isEmpty() && displays.get(0) instanceof net.minecraft.world.item.crafting.display.SmithingRecipeDisplay smithing) {
                     List<net.minecraft.world.item.crafting.display.SlotDisplay> slots = List.of(smithing.template(), smithing.base(), smithing.addition());
@@ -953,14 +990,16 @@ public class CeiItemInfoScreen extends Screen {
                         drawSlotBg(context, sX, slotY);
                         ItemStack match = slots.get(i).resolveForFirstStack(contextMap);
                         if (match != null && !match.isEmpty()) {
-                            com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, match, sX + 1, slotY + 1);
+                            context.item(match, sX + 1, slotY + 1);
                             activeSlots.add(new RenderedSlot(match, sX, slotY, 18));
                         }
                     }
                 }
                 
+                // Arrow
                 drawArrow(context, slotX + 65, slotY + 2);
                 
+                // Output
                 int outX = slotX + 100;
                 drawSlotBg(context, outX, slotY);
                 try {
@@ -968,7 +1007,7 @@ public class CeiItemInfoScreen extends Screen {
                     if (!displays.isEmpty()) {
                         outStack = displays.get(0).result().resolveForFirstStack(contextMap);
                     }
-                    com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, outStack, outX + 1, slotY + 1);
+                    context.item(outStack, outX + 1, slotY + 1);
                     activeSlots.add(new RenderedSlot(outStack, outX, slotY, 18));
                 } catch (Exception e) {}
                 break;
@@ -976,10 +1015,66 @@ public class CeiItemInfoScreen extends Screen {
             case CUSTOM: {
                 RecipeHolder<?> entry = (RecipeHolder<?>) recipeObj;
                 Recipe<?> recipe = entry.value();
+
+                // Nouveau pipeline : la grille vient de la recette elle-meme.
+                // L'ancien code plafonnait a 4 entrees sur une seule ligne
+                // (Math.min(4, totalInputs)), ce qui tronquait toute recette
+                // moddee depassant ce format et en perdait la disposition.
+                var view = com.ceketrum.cei.config.CeiConfig.getInstance().isUseNewRecipeRenderer()
+                        ? com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeAdapter.from(recipe, contextMap)
+                        : null;
+
+                if (view != null) {
+                    long now = System.currentTimeMillis();
+                    int cols = Math.max(1, view.gridWidth());
+                    int rows = Math.max(1, view.gridHeight());
+
+                    List<ItemStack> vOutputs = view.outputs();
+                    if (vOutputs.isEmpty() && activeMainTab == TabType.CRAFTING) {
+                        vOutputs = List.of(targetStack);
+                    }
+                    int displayOut = Math.max(1, Math.min(4, vOutputs.size()));
+
+                    int gridW = cols * 20;
+                    int outW = displayOut * 20;
+                    int totalW = gridW + 24 + outW;
+                    int startX = contentX + (contentWidth - totalW) / 2;
+                    int startY = contentY + 24;
+
+                    for (int r = 0; r < rows; r++) {
+                        for (int c = 0; c < cols; c++) {
+                            int slotX = startX + c * 20;
+                            int slotY = startY + r * 20;
+                            drawSlotBg(context, slotX, slotY);
+                            ItemStack stack = view.slotAt(c, r).current(now);
+                            if (stack != null && !stack.isEmpty()) {
+                                context.item(stack, slotX + 1, slotY + 1);
+                                activeSlots.add(new RenderedSlot(stack, slotX, slotY, 18));
+                            }
+                        }
+                    }
+
+                    int midY = startY + (rows * 20) / 2 - 9;
+                    drawArrow(context, startX + gridW + 3, midY + 2);
+
+                    for (int i = 0; i < displayOut; i++) {
+                        int slotX = startX + gridW + 24 + i * 20;
+                        drawSlotBg(context, slotX, midY);
+                        ItemStack stack = i < vOutputs.size() ? vOutputs.get(i) : ItemStack.EMPTY;
+                        if (stack != null && !stack.isEmpty()) {
+                            context.item(stack, slotX + 1, midY + 1);
+                            activeSlots.add(new RenderedSlot(stack, slotX, midY, 18));
+                        }
+                    }
+                    break;
+                }
+
+                // --- ancien chemin, conserve tant que les deux cohabitent ---
                 
                 List<ItemStack> inputs = extractCustomInputs(recipe, contextMap);
                 List<ItemStack> outputs = extractCustomOutputs(recipe, contextMap);
                 
+                // Ensure we have at least one input and output to show
                 if (inputs.isEmpty()) {
                     if (activeMainTab == TabType.USAGES) {
                         inputs.add(targetStack);
@@ -998,6 +1093,7 @@ public class CeiItemInfoScreen extends Screen {
                 int totalInputs = inputs.size();
                 int totalOutputs = outputs.size();
                 
+                // Limit to 4 inputs and 4 outputs for single-line horizontal alignment
                 int displayInputs = Math.min(4, totalInputs);
                 int displayOutputs = Math.min(4, totalOutputs);
                 
@@ -1008,26 +1104,29 @@ public class CeiItemInfoScreen extends Screen {
                 int startX = contentX + (contentWidth - totalWidth) / 2;
                 int startY = contentY + 24;
                 
+                // Draw Inputs
                 for (int i = 0; i < displayInputs; i++) {
                     int slotX = startX + i * 20;
                     drawSlotBg(context, slotX, startY);
                     ItemStack stack = inputs.get(i);
                     if (stack != null && !stack.isEmpty()) {
-                        com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, stack, slotX + 1, startY + 1);
+                        context.item(stack, slotX + 1, startY + 1);
                         activeSlots.add(new RenderedSlot(stack, slotX, startY, 18));
                     }
                 }
                 
+                // Draw Arrow
                 int arrowX = startX + inputsWidth + 3;
                 int arrowY = startY + 2;
                 drawArrow(context, arrowX, arrowY);
                 
+                // Draw Outputs
                 for (int i = 0; i < displayOutputs; i++) {
                     int slotX = startX + inputsWidth + 24 + i * 20;
                     drawSlotBg(context, slotX, startY);
                     ItemStack stack = outputs.get(i);
                     if (stack != null && !stack.isEmpty()) {
-                        com.ceketrum.cei.gui.util.CeiGraphics.renderItem(context, stack, slotX + 1, startY + 1);
+                        context.item(stack, slotX + 1, startY + 1);
                         activeSlots.add(new RenderedSlot(stack, slotX, startY, 18));
                     }
                 }
@@ -1035,36 +1134,39 @@ public class CeiItemInfoScreen extends Screen {
             }
         }
         
+        // Draw Pagination details
         int pageY = containerY + containerHeight - 16;
         String pageStr = String.format("%d / %d", currentPage + 1, getMaxPages());
         int pageW = this.font.width(pageStr);
-        com.ceketrum.cei.gui.util.CeiGraphics.drawString(context, this.font, Component.literal(pageStr), contentX + (contentWidth - pageW) / 2, pageY, 0xFF888888, false);
+        context.text(this.font, pageStr, contentX + (contentWidth - pageW) / 2, pageY, 0xFF888888, false);
         
+        // Left & Right Arrow buttons
         int arrowLeftX = contentX + (contentWidth - pageW) / 2 - 15;
         int arrowRightX = contentX + (contentWidth + pageW) / 2 + 5;
         
         boolean hoverLeft = mouseX >= arrowLeftX && mouseX < arrowLeftX + 8 && mouseY >= pageY && mouseY < pageY + 9;
         boolean hoverRight = mouseX >= arrowRightX && mouseX < arrowRightX + 8 && mouseY >= pageY && mouseY < pageY + 9;
         
-        com.ceketrum.cei.gui.util.CeiGraphics.drawString(context, this.font, Component.literal("<"), arrowLeftX, pageY, hoverLeft ? 0xFFFFFFFF : 0xFF888888, false);
-        com.ceketrum.cei.gui.util.CeiGraphics.drawString(context, this.font, Component.literal(">"), arrowRightX, pageY, hoverRight ? 0xFFFFFFFF : 0xFF888888, false);
+        context.text(this.font, "<", arrowLeftX, pageY, hoverLeft ? 0xFFFFFFFF : 0xFF888888, false);
+        context.text(this.font, ">", arrowRightX, pageY, hoverRight ? 0xFFFFFFFF : 0xFF888888, false);
     }
     
-    private void drawSlotBg(Object context, int x, int y) {
+    private void drawSlotBg(GuiGraphicsExtractor context, int x, int y) {
         int color = applyOpacity(0xFF181818, this.currentOpacity);
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, x, y, x + 18, y + 18, color);
-        com.ceketrum.cei.gui.util.CeiGraphics.renderOutline(context, x, y, 18, 18, applyOpacity(0x33FFFFFF, this.currentOpacity));
+        context.fill(x, y, x + 18, y + 18, color);
+        context.outline(x, y, 18, 18, applyOpacity(0x33FFFFFF, this.currentOpacity));
     }
     
-    private void drawArrow(Object context, int x, int y) {
+    private void drawArrow(GuiGraphicsExtractor context, int x, int y) {
+        // Render simple elegant horizontal arrow
         int color = applyOpacity(0x66FFFFFF, this.currentOpacity);
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, x, y + 6, x + 18, y + 8, color);
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, x + 14, y + 4, x + 15, y + 10, color);
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, x + 16, y + 5, x + 17, y + 9, color);
-        com.ceketrum.cei.gui.util.CeiGraphics.fill(context, x + 17, y + 6, x + 18, y + 8, color);
+        context.fill(x, y + 6, x + 18, y + 8, color);
+        context.fill(x + 14, y + 4, x + 15, y + 10, color);
+        context.fill(x + 16, y + 5, x + 17, y + 9, color);
+        context.fill(x + 17, y + 6, x + 18, y + 8, color);
     }
     
-    private void drawTooltips(Object context, int mouseX, int mouseY) {
+    private void drawTooltips(GuiGraphicsExtractor context, int mouseX, int mouseY) {
         String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
         boolean isFr = lang != null && lang.toLowerCase().startsWith("fr");
         
@@ -1078,7 +1180,7 @@ public class CeiItemInfoScreen extends Screen {
             String tooltipText = isPinned 
                 ? (isFr ? "Désancrer la recette" : "Unpin recipe")
                 : (isFr ? "Ancrer la recette" : "Pin recipe");
-            com.ceketrum.cei.gui.util.CeiGraphics.setTooltipForNextFrame(context, this.font, Component.literal(tooltipText), mouseX, mouseY);
+            context.setTooltipForNextFrame(this.font, Component.literal(tooltipText), mouseX, mouseY);
             return;
         }
         
@@ -1089,7 +1191,7 @@ public class CeiItemInfoScreen extends Screen {
                 String tooltipText = card.isShowInHud()
                     ? (isFr ? "Masquer sur l'écran de jeu" : "Hide on HUD")
                     : (isFr ? "Afficher sur l'écran de jeu" : "Show on HUD");
-                com.ceketrum.cei.gui.util.CeiGraphics.setTooltipForNextFrame(context, this.font, Component.literal(tooltipText), mouseX, mouseY);
+                context.setTooltipForNextFrame(this.font, Component.literal(tooltipText), mouseX, mouseY);
                 return;
             }
             
@@ -1100,7 +1202,7 @@ public class CeiItemInfoScreen extends Screen {
                     isFr ? "Opacité" : "Opacity", 
                     (int) (card.getOpacity() * 100)
                 );
-                com.ceketrum.cei.gui.util.CeiGraphics.setTooltipForNextFrame(context, this.font, Component.literal(tooltipText), mouseX, mouseY);
+                context.setTooltipForNextFrame(this.font, Component.literal(tooltipText), mouseX, mouseY);
                 return;
             }
         }
@@ -1119,7 +1221,7 @@ public class CeiItemInfoScreen extends Screen {
                     case LOOT -> isFr ? "Comment l'obtenir (Loot)" : "Obtaining (Loot)";
                     case WORLD -> isFr ? "Biomes et Structures" : "Biomes and Structures";
                 };
-                com.ceketrum.cei.gui.util.CeiGraphics.setTooltipForNextFrame(context, this.font, Component.literal(tooltipText), mouseX, mouseY);
+                context.setTooltipForNextFrame(this.font, Component.literal(tooltipText), mouseX, mouseY);
                 return;
             }
         }
@@ -1153,15 +1255,12 @@ public class CeiItemInfoScreen extends Screen {
                                 }
                             }
                             if (matchedRecipe != null) {
-                                ItemStack machineStack = getMachineIcon(matchedRecipe);
-                                if (machineStack.getItem() != Items.DISPENSER) {
-                                    yield machineStack.getHoverName().getString();
-                                }
+                                yield getMachineLabel(matchedRecipe, isFr);
                             }
                             yield isFr ? "Machine Spéciale (Mod)" : "Special Machine (Mod)";
                         }
                     };
-                    com.ceketrum.cei.gui.util.CeiGraphics.setTooltipForNextFrame(context, this.font, Component.literal(tooltipText), mouseX, mouseY);
+                    context.setTooltipForNextFrame(this.font, Component.literal(tooltipText), mouseX, mouseY);
                     return;
                 }
             }
@@ -1171,7 +1270,7 @@ public class CeiItemInfoScreen extends Screen {
         for (RenderedSlot slot : activeSlots) {
             if (mouseX >= slot.x && mouseX < slot.x + slot.size && mouseY >= slot.y && mouseY < slot.y + slot.size) {
                 hoveredSlot = slot;
-                com.ceketrum.cei.gui.util.CeiGraphics.renderTooltip(context, this.font, slot.stack, mouseX, mouseY);
+                context.setTooltipForNextFrame(this.font, slot.stack, mouseX, mouseY);
                 return;
             }
         }
@@ -1188,7 +1287,10 @@ public class CeiItemInfoScreen extends Screen {
             if (mouseX >= plusX && mouseX < plusX + 12 && mouseY >= plusY && mouseY < plusY + 12) {
                 String title = isFr ? "Remplir la Table de Craft (+)" : "Fill Crafting Table (+)";
                 String hint = isFr ? "Shift + Clic : Remplir au maximum" : "Shift + Click: Fill maximum";
-                com.ceketrum.cei.gui.util.CeiGraphics.setTooltipForNextFrame(context, this.font, Component.literal(title + "\n" + hint), mouseX, mouseY);
+                context.setTooltipForNextFrame(this.font, List.of(
+                    Component.literal(title).withStyle(ChatFormatting.GREEN).getVisualOrderText(),
+                    Component.literal(hint).withStyle(ChatFormatting.GRAY).getVisualOrderText()
+                ), mouseX, mouseY);
                 return;
             }
         }
@@ -1218,13 +1320,11 @@ public class CeiItemInfoScreen extends Screen {
     
     @Override
     public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
-        if (handleMouseClick(event.x(), event.y(), event.button())) {
-            return true;
-        }
-        return super.mouseClicked(event, doubleClick);
-    }
-
-    public boolean handleMouseClick(double mouseX, double mouseY, int button) {
+        com.ceketrum.cei.gui.util.CeiScreenHelper.setShiftDown(event.hasShiftDown());
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
+        
         if (this.ceiModule != null && this.ceiModule.handleMouseClick(mouseX, mouseY, button, this.width, this.height, this.font)) {
             return true;
         }
@@ -1245,8 +1345,12 @@ public class CeiItemInfoScreen extends Screen {
                 Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
             } else {
                 manager.pinRecipe(this.targetStack, this.activeMainTab, this.activeCategory, this.currentPage, null);
+                
+                // Play click sound
                 Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
-                com.ceketrum.cei.gui.util.CeiScreenHelper.setScreen(this.minecraft, this.parentScreen);
+                
+                // Return to base interface (parent screen) since recipe card is now pinned and rendered as overlay!
+                com.ceketrum.cei.gui.util.CeiScreens.set(this.parentScreen);
             }
             return true;
         }
@@ -1305,8 +1409,11 @@ public class CeiItemInfoScreen extends Screen {
                     quantity
                 );
                 
+                // Play click sound
                 Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
-                com.ceketrum.cei.gui.util.CeiScreenHelper.setScreen(this.minecraft, this.parentScreen);
+                
+                // Instantly go back to parent screen (crafting table) so they can take the crafted item!
+                com.ceketrum.cei.gui.util.CeiScreens.set(this.parentScreen);
                 return true;
             }
         }
@@ -1372,52 +1479,30 @@ public class CeiItemInfoScreen extends Screen {
         // 4. Clicked on a recipe slot -> Navigate to that item!
         if (hoveredSlot != null && (button == 0 || button == 1)) {
             boolean showUsage = (button == 1);
-            com.ceketrum.cei.gui.util.CeiScreenHelper.setScreen(Minecraft.getInstance(), new CeiItemInfoScreen(this.parentScreen, hoveredSlot.stack, showUsage));
+            com.ceketrum.cei.gui.util.CeiScreens.set(new CeiItemInfoScreen(this.parentScreen, hoveredSlot.stack, showUsage));
             Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
             return true;
         }
         
-        return false;
+        return super.mouseClicked(event, doubleClick);
     }
     
-    public boolean mouseDragged261(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    @Override
+    public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double deltaX, double deltaY) {
         var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
         var card = manager.getPinnedCard(this.targetStack);
         if (card != null && card.isDragging()) {
             double newXOffset = card.getxOffset() + deltaX;
             double newYOffset = card.getyOffset() + deltaY;
+            
+            // Constrain dragging offsets to the bounds of the window so the recipe card cannot be lost off-screen.
             double minX = - (double)(this.width - this.containerWidth) / 2;
             double maxX = (double)(this.width - this.containerWidth) / 2;
             double minY = - (double)(this.height - this.containerHeight) / 2;
             double maxY = (double)(this.height - this.containerHeight) / 2;
+            
             card.setxOffset(Math.max(minX, Math.min(maxX, newXOffset)));
             card.setyOffset(Math.max(minY, Math.min(maxY, newYOffset)));
-            return true;
-        }
-        return false;
-    }
-
-    public boolean mouseReleased261(double mouseX, double mouseY, int button) {
-        var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
-        var card = manager.getPinnedCard(this.targetStack);
-        if (card != null && card.isDragging()) {
-            card.setDragging(false);
-            return true;
-        }
-        return false;
-    }
-
-    public boolean handleKeyPress261(int key, int scancode, int mods) {
-        if (key == 256 || (this.minecraft != null && this.minecraft.options != null && com.ceketrum.cei.gui.util.CeiScreenHelper.keyMatches(this.minecraft.options.keyInventory, key, scancode))) {
-            com.ceketrum.cei.gui.util.CeiScreenHelper.setScreen(this.minecraft, parentScreen);
-            return true;
-        }
-        return false;
-    }
-
-    @Override
-    public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double deltaX, double deltaY) {
-        if (mouseDragged261(event.x(), event.y(), event.button(), deltaX, deltaY)) {
             return true;
         }
         return super.mouseDragged(event, deltaX, deltaY);
@@ -1425,7 +1510,10 @@ public class CeiItemInfoScreen extends Screen {
 
     @Override
     public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
-        if (mouseReleased261(event.x(), event.y(), event.button())) {
+        var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
+        var card = manager.getPinnedCard(this.targetStack);
+        if (card != null && card.isDragging()) {
+            card.setDragging(false);
             return true;
         }
         return super.mouseReleased(event);
@@ -1433,9 +1521,9 @@ public class CeiItemInfoScreen extends Screen {
     
     @Override
     public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
-        int keyCode = event.key();
-        int scanCode = event.scancode();
-        int modifiers = event.modifiers();
+        int keyCode = com.ceketrum.cei.gui.util.CeiInput.key(event);
+        int scanCode = com.ceketrum.cei.gui.util.CeiInput.scancode(event);
+        int modifiers = 0;
 
         if (this.ceiModule != null && this.ceiModule.getPanelRenderer().getSearchBar().isFocused()) {
             if (this.ceiModule.handleKeyPress(keyCode, scanCode, modifiers)) {
@@ -1443,8 +1531,8 @@ public class CeiItemInfoScreen extends Screen {
             }
         }
         
-        if (keyCode == 256 || this.minecraft.options.keyInventory.matches(event)) {
-            com.ceketrum.cei.gui.util.CeiScreenHelper.setScreen(this.minecraft, parentScreen);
+        if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.ESCAPE || this.minecraft.options.keyInventory.matches(event)) {
+            com.ceketrum.cei.gui.util.CeiScreens.set(parentScreen);
             return true;
         }
         
@@ -1456,12 +1544,12 @@ public class CeiItemInfoScreen extends Screen {
         }
         
         if (hoverStack != null && !hoverStack.isEmpty()) {
-            if (keyCode == 82) { // 'R'
-                com.ceketrum.cei.gui.util.CeiScreenHelper.setScreen(this.minecraft, new CeiItemInfoScreen(this.parentScreen, hoverStack, false));
+            if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.R) { // 'R'
+                com.ceketrum.cei.gui.util.CeiScreens.set(new CeiItemInfoScreen(this.parentScreen, hoverStack, false));
                 return true;
             }
-            if (keyCode == 85) { // 'U'
-                com.ceketrum.cei.gui.util.CeiScreenHelper.setScreen(this.minecraft, new CeiItemInfoScreen(this.parentScreen, hoverStack, true));
+            if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.U) { // 'U'
+                com.ceketrum.cei.gui.util.CeiScreens.set(new CeiItemInfoScreen(this.parentScreen, hoverStack, true));
                 return true;
             }
         }
@@ -1653,7 +1741,8 @@ public class CeiItemInfoScreen extends Screen {
             
             // Methods - only invoke zero-arg getters that sound like output getters
             for (Method m : clazz.getDeclaredMethods()) {
-                if (m.getParameterCount() == 0 && !m.getReturnType().equals(Void.TYPE)) {
+                if (m.getParameterCount() == 0 && !m.getReturnType().equals(Void.TYPE)
+                        && cei$mayHoldItems(m.getReturnType())) {
                     String mName = m.getName().toLowerCase();
                     if (mName.contains("result") || mName.contains("output") || mName.contains("item") || 
                         mName.contains("stack") || mName.contains("ingredient") || mName.contains("recipe") ||
@@ -1743,11 +1832,23 @@ public class CeiItemInfoScreen extends Screen {
     }
     
     private void unpackInputObject(Object obj, List<ItemStack> list) {
-        unpackInputObject(obj, list, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+        unpackInputObject(obj, list, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()), 0);
     }
 
-    private void unpackInputObject(Object obj, List<ItemStack> list, Set<Object> visited) {
-        if (obj == null || !visited.add(obj)) return;
+    /** Profondeur maximale d'exploration du graphe d'objets. */
+    private static final int CEI_UNPACK_MAX_DEPTH = 8;
+    /** Nombre maximal d'objets visites, filet de securite global. */
+    private static final int CEI_UNPACK_MAX_VISITED = 2000;
+
+    private void unpackInputObject(Object obj, List<ItemStack> list, Set<Object> visited, int depth) {
+        // Le set `visited` ne suffit PAS a garantir la terminaison : les methodes
+        // sans argument du type stream() / iterator() / copy() renvoient un objet
+        // NEUF a chaque appel, donc visited.add() reussit toujours. Sans ces
+        // bornes, l'exploration part en StackOverflowError (constate sur 26.3).
+        if (obj == null) return;
+        if (depth > CEI_UNPACK_MAX_DEPTH) return;
+        if (visited.size() > CEI_UNPACK_MAX_VISITED) return;
+        if (!visited.add(obj)) return;
         
         if (obj instanceof net.minecraft.world.item.crafting.Ingredient ing) {
             java.util.List<ItemStack> matches = ing.items().map(h -> new ItemStack(h.value())).toList();
@@ -1778,7 +1879,7 @@ public class CeiItemInfoScreen extends Screen {
         
         if (obj instanceof Collection<?> col) {
             for (Object el : col) {
-                unpackInputObject(el, list, visited);
+                unpackInputObject(el, list, visited, depth + 1);
             }
             return;
         }
@@ -1786,14 +1887,14 @@ public class CeiItemInfoScreen extends Screen {
         if (obj.getClass().isArray()) {
             int length = java.lang.reflect.Array.getLength(obj);
             for (int i = 0; i < length; i++) {
-                unpackInputObject(java.lang.reflect.Array.get(obj, i), list, visited);
+                unpackInputObject(java.lang.reflect.Array.get(obj, i), list, visited, depth + 1);
             }
             return;
         }
 
         if (obj instanceof java.util.Optional<?> opt) {
             if (opt.isPresent()) {
-                unpackInputObject(opt.get(), list, visited);
+                unpackInputObject(opt.get(), list, visited, depth + 1);
             }
             return;
         }
@@ -1816,14 +1917,15 @@ public class CeiItemInfoScreen extends Screen {
                     f.setAccessible(true);
                     Object val = f.get(obj);
                     if (val != null) {
-                        unpackInputObject(val, list, visited);
+                        unpackInputObject(val, list, visited, depth + 1);
                     }
                 } catch (Exception e) {}
             }
             
             // Methods
             for (Method m : clazz.getDeclaredMethods()) {
-                if (m.getParameterCount() == 0 && !m.getReturnType().equals(Void.TYPE)) {
+                if (m.getParameterCount() == 0 && !m.getReturnType().equals(Void.TYPE)
+                        && cei$mayHoldItems(m.getReturnType())) {
                     // Filter out standard Object methods and dangerous methods
                     String mName = m.getName();
                     if (mName.equals("toString") || mName.equals("hashCode") || mName.equals("getClass") || 
@@ -1835,7 +1937,7 @@ public class CeiItemInfoScreen extends Screen {
                         m.setAccessible(true);
                         Object val = m.invoke(obj);
                         if (val != null) {
-                            unpackInputObject(val, list, visited);
+                            unpackInputObject(val, list, visited, depth + 1);
                         }
                     } catch (Exception e) {}
                 }
@@ -1844,7 +1946,74 @@ public class CeiItemInfoScreen extends Screen {
         }
     }
 
+    /**
+     * N'invoque par reflexion que les accesseurs susceptibles de contenir des
+     * items. Sans ce filtre, on appelle stream(), iterator(), entrySet()... qui
+     * allouent un objet neuf a chaque fois et rendent l'exploration infinie.
+     */
+    private static boolean cei$mayHoldItems(Class<?> t) {
+        if (t.isArray()) return cei$mayHoldItems(t.getComponentType());
+        return ItemStack.class.isAssignableFrom(t)
+            || net.minecraft.world.item.crafting.Ingredient.class.isAssignableFrom(t)
+            || Item.class.isAssignableFrom(t)
+            || Block.class.isAssignableFrom(t)
+            || Collection.class.isAssignableFrom(t)
+            || java.util.Optional.class.isAssignableFrom(t);
+    }
+
+    /**
+     * Libelle de la station de travail d'une recette moddee.
+     *
+     * L'ancien comportement affichait "Custom Machine" des que l'icone retombait
+     * sur le distributeur, c'est-a-dire pour la quasi-totalite des recettes
+     * moddees. On passe ici par CeiRecipeStation, qui derive un nom du type de
+     * recette (create:crushing -> "Crushing Wheel", a defaut "Crushing").
+     */
+    private String getMachineLabel(Recipe<?> recipe, boolean isFr) {
+        if (recipe == null) return isFr ? "Machine Spéciale" : "Custom Machine";
+        ItemStack icon = getMachineIcon(recipe);
+        if (icon != null && !icon.isEmpty() && icon.getItem() != Items.DISPENSER) {
+            String name = icon.getHoverName().getString();
+            if (name != null && !name.isBlank()) return name;
+        }
+        Identifier typeId = null;
+        try {
+            typeId = BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType());
+        } catch (Exception e) {
+            // type non enregistre : on laisse CeiRecipeStation gerer le null
+        }
+        return com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation.labelFor(typeId, isFr);
+    }
+
+    /**
+     * Memorisation des icones de machine.
+     *
+     * getMachineIconUncached finit par balayer tout le registre des items dans
+     * son dernier repli. Sans cache, ce balayage avait lieu a CHAQUE frame et
+     * pour chaque onglet de categorie affiche -- un cout invisible en vanilla,
+     * net sur un gros pack modde. La cle est le type de recette : deux recettes
+     * du meme type donnent la meme icone.
+     */
+    private static final java.util.Map<Identifier, ItemStack> MACHINE_ICON_CACHE = new java.util.HashMap<>();
+
     private ItemStack getMachineIcon(Recipe<?> recipe) {
+        if (recipe == null) return new ItemStack(Items.DISPENSER);
+        Identifier typeId = null;
+        try {
+            typeId = BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType());
+        } catch (Exception e) {
+            // type non enregistre : on ne memorise pas, on calcule a chaque fois
+        }
+        if (typeId == null) return getMachineIconUncached(recipe);
+        ItemStack cached = MACHINE_ICON_CACHE.get(typeId);
+        if (cached == null) {
+            cached = getMachineIconUncached(recipe);
+            MACHINE_ICON_CACHE.put(typeId, cached);
+        }
+        return cached.copy();
+    }
+
+    private ItemStack getMachineIconUncached(Recipe<?> recipe) {
         var client = Minecraft.getInstance();
         if (client.level == null) return new ItemStack(Items.DISPENSER);
         
@@ -1967,6 +2136,20 @@ public class CeiItemInfoScreen extends Screen {
                 if (fallbackBlock != null && fallbackBlock != Items.AIR) return new ItemStack(fallbackBlock);
             }
             
+            // 1.21.5+ : la recette porte elle-meme sa station de travail.
+            ItemStack declared = com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation
+                    .fromDisplay(recipe);
+            if (!declared.isEmpty()) return declared;
+
+            // Repli generique fonde sur l'identifiant du type de recette :
+            // create:crushing -> create:crushing_wheel. Aucune connaissance
+            // specifique a un mod, et le resultat est memorise. Place AVANT la
+            // recherche floue ci-dessous, qui compare des sous-chaines de noms
+            // de classe et peut renvoyer a peu pres n'importe quel item.
+            ItemStack station = com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation
+                    .iconFor(BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType()));
+            if (!station.isEmpty()) return station;
+
             // 3. Fuzzy search in same namespace
             if (namespace != null) {
                 for (Identifier id : BuiltInRegistries.ITEM.keySet()) {
