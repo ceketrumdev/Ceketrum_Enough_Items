@@ -24,6 +24,10 @@ pluginManagement {
 rootProject.name = 'cei'
 
 include 'G1:fabric'
+// NeoForge 47.x pour 1.20.1 : encore un fork direct de Forge, packages
+// net.minecraftforge.*. Le jar produit devrait aussi se charger sous
+// MinecraftForge 47.x, a verifier en jeu.
+include 'G1:neoforge'
 
 include 'G2:fabric'
 include 'G2:neoforge'
