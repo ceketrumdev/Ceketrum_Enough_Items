@@ -149,8 +149,12 @@ public class LootTableSourceManager {
             itemToLootIds.clear();
             int scannedTables = 0;
             
-            // Itérer sur toutes les loot tables enregistrées (vanilla et moddées)
-            for (var key : lootTableRegistry.registryKeySet()) {
+            // Itérer sur toutes les loot tables enregistrées (vanilla et moddées).
+            // listElementIds() et non registryKeySet() : ce dernier n'existe que
+            // sur Registry, alors que les registres rechargeables ne donnent
+            // qu'un HolderLookup.RegistryLookup. listElementIds() est declare sur
+            // HolderLookup, donc disponible sur les deux sources.
+            for (var key : lootTableRegistry.listElementIds().toList()) {
                 LootTable lootTable = lootTableRegistry.get(key).map(net.minecraft.core.Holder::value).orElse(null);
                 Identifier id = key.identifier();
                 
@@ -354,7 +358,9 @@ public class LootTableSourceManager {
                 if (server != null) {
                     var lootTableRegistry = cei$lootTableLookup(server);
                     if (lootTableRegistry != null) {
-                        LootTable table = lootTableRegistry.get(id).map(net.minecraft.core.Holder::value).orElse(null);
+                        var lootKey = net.minecraft.resources.ResourceKey.create(
+                                net.minecraft.core.registries.Registries.LOOT_TABLE, id);
+                        LootTable table = lootTableRegistry.get(lootKey).map(net.minecraft.core.Holder::value).orElse(null);
                         if (table != null && table != LootTable.EMPTY) {
                             scanObjectRecursively(table, items, visited, depth);
                         }
