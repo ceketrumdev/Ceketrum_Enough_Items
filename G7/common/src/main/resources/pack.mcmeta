@@ -1,0 +1,10 @@
+{
+  "pack": {
+    "description": "CEI - Ceketrum Enhanced Inventory",
+    "max_format": 88,
+    "min_format": [
+      88,
+      0
+    ]
+  }
+}

@@ -44,6 +44,17 @@ dependencies {
     forge "net.neoforged:forge:${project.neoforge_version}"
 }
 
+// Sans ce bloc, mods.toml part avec la chaine litterale ${version} et Forge
+// refuse le jar : "Illegal version number specified version". C'est le seul
+// module du projet qui ne l'avait pas -- il n'avait jamais ete construit.
+processResources {
+    inputs.property "version", project.version
+
+    filesMatching(["META-INF/mods.toml", "META-INF/neoforge.mods.toml"]) {
+        expand "version": inputs.properties.version
+    }
+}
+
 tasks.withType(JavaCompile).configureEach {
     it.options.release = 17
 }
