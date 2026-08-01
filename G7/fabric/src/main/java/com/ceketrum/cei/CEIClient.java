@@ -25,7 +25,7 @@ public class CEIClient implements ClientModInitializer {
 		// Register connection events to clear and re-initialize caches
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
 			// La liste d'items est partagee : on la reconstruit a la connexion,
-			pour prendre en compte les items ajoutes par le serveur / les mods.
+			// pour prendre en compte les items ajoutes par le serveur / les mods.
 			com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
 			BrewingRecipeManager.getInstance().clearCache();
 			LootTableSourceManager.getInstance().clearCache();

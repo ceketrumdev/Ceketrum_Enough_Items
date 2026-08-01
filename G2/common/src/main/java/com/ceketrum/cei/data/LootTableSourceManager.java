@@ -117,7 +117,12 @@ public class LootTableSourceManager {
                         System.currentTimeMillis() - startTime, scannedTables, globalLootCache.size());
             
         } catch (Exception e) {
-            LOGGER.error("[LOOT] Erreur lors du scan global des loot tables: {}", e.getMessage(), e);
+            // On marque le cache comme construit meme en cas d'echec. Cette
+            // methode est appelee depuis le rendu : sans ce drapeau, un echec se
+            // repetait a chaque frame et noyait le log sous plusieurs centaines
+            // de stacktraces par seconde.
+            isCacheBuilt = true;
+            LOGGER.error("[LOOT] Scan global des loot tables abandonne : {}", e.getMessage(), e);
         }
     }
     

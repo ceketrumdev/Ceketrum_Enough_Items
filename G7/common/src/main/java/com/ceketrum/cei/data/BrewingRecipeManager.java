@@ -65,202 +65,57 @@ public class BrewingRecipeManager {
      */
     private volatile boolean cei$degraded = false;
 
+    /**
+     * Construit le cache des recettes de brassage.
+     *
+     * L'API est appelee DIRECTEMENT, sans reflexion. L'ancien code passait par
+     * Class.forName sur des noms Minecraft, ce qui ne pouvait pas aboutir : sous
+     * Fabric le jeu tourne en mappings intermediary et Loom ne remappe pas le
+     * contenu des chaines. L'onglet brassage etait donc vide depuis toujours.
+     *
+     * Attention a l'ordre des arguments, releve au bytecode et NON symetrique :
+     *     hasMix(potion, ingredient)   --  teste isContainer() sur le 1er argument
+     *     mix(ingredient, potion)      --  lit POTION_CONTENTS sur le 2e
+     */
     public synchronized void ensureCacheBuilt() {
-        if (cei$degraded) {
-            return;
-        }
-        try {
-            cei$ensureCacheBuiltImpl();
-        } catch (LinkageError | Exception e) {
-            cei$degraded = true;
-            org.slf4j.LoggerFactory.getLogger("cei").warn(
-                "CEI: BrewingRecipeManager desactive sur cette version de Minecraft ({}). "
-                + "La fonctionnalite associee restera vide, le reste du mod fonctionne.",
-                e.toString());
-        }
-    }
-
-    private synchronized void cei$ensureCacheBuiltImpl() {
         if (isCacheBuilt) {
             return;
         }
-        
+
         Minecraft client = Minecraft.getInstance();
         if (client == null || client.level == null) {
             return;
         }
-        
-        // En multijoueur, pas de serveur intégré local. On skip le scan serveur de recettes pour éviter les spams/lags
+
+        // Les melanges de brassage vivent cote serveur : en multijoueur on ne
+        // peut que constater l'absence, sans reessayer a chaque ouverture.
         if (!client.isLocalServer()) {
             isCacheBuilt = true;
-            LOGGER.info("[BREWING] Client en multijoueur, skip du scan serveur des recettes de brewing.");
+            LOGGER.info("[BREWING] Client en multijoueur : recettes de brassage indisponibles.");
             return;
         }
-        
+
         MinecraftServer server = client.getSingleplayerServer();
-        
         if (server == null) {
             attempts++;
             if (attempts >= MAX_ATTEMPTS) {
                 isCacheBuilt = true;
-                LOGGER.warn("[BREWING] Nombre maximum de tentatives d'accès au serveur atteint en solo. Skip.");
+                LOGGER.warn("[BREWING] Serveur integre inaccessible apres {} tentatives.", MAX_ATTEMPTS);
             }
             return;
         }
-        
-        LOGGER.info("[BREWING] Construction du cache global des recettes de brewing...");
-        long startTime = System.currentTimeMillis();
-        
+
         try {
-            Class<?> brewingRecipeRegistryClass = null;
-            String[] possibleClassNames = {
-                "net.minecraft.brewing.BrewingRecipeRegistry",
-                "net.minecraft.item.BrewingRecipeRegistry",
-                "net.minecraft.potion.BrewingRecipeRegistry",
-                "net.minecraft.recipe.BrewingRecipeRegistry"
-            };
-            
-            for (String className : possibleClassNames) {
-                try {
-                    brewingRecipeRegistryClass = Class.forName(className);
-                    break;
-                } catch (ClassNotFoundException e) {}
-            }
-            
-            if (brewingRecipeRegistryClass == null) {
-                LOGGER.error("[BREWING] BrewingRecipeRegistry non trouvé");
+            long startTime = System.currentTimeMillis();
+            cache.clear();
+
+            var brewing = server.potionBrewing();
+            if (brewing == null) {
+                isCacheBuilt = true;
+                LOGGER.warn("[BREWING] Aucune table de brassage cote serveur.");
                 return;
             }
-            
-            Method hasRecipeMethod = null;
-            Method craftMethod = null;
-            try {
-                hasRecipeMethod = brewingRecipeRegistryClass.getMethod("hasRecipe", ItemStack.class, ItemStack.class);
-                craftMethod = brewingRecipeRegistryClass.getMethod("craft", ItemStack.class, ItemStack.class);
-            } catch (NoSuchMethodException e) {
-                LOGGER.error("[BREWING] Méthodes d'instance non trouvées dans BrewingRecipeRegistry");
-                return;
-            }
-            
-            // Trouver la méthode create()
-            Method createMethod = null;
-            for (Method method : brewingRecipeRegistryClass.getDeclaredMethods()) {
-                if (method.getName().equals("create")) {
-                    createMethod = method;
-                    createMethod.setAccessible(true);
-                    break;
-                }
-            }
-            if (createMethod == null) {
-                for (Method method : brewingRecipeRegistryClass.getMethods()) {
-                    if (method.getName().equals("create") && method.getDeclaringClass() != Object.class) {
-                        createMethod = method;
-                        break;
-                    }
-                }
-            }
-            if (createMethod == null) {
-                LOGGER.error("[BREWING] Méthode create() non trouvée");
-                return;
-            }
-            
-            Object brewingRegistry = null;
-            Object featureSet = null;
-            try {
-                if (createMethod.getParameterCount() == 0) {
-                    brewingRegistry = createMethod.invoke(null);
-                } else {
-                    Class<?>[] paramTypes = createMethod.getParameterTypes();
-                    Class<?> featureSetClass = paramTypes[0];
-                    
-                    try {
-                        Method getSavePropertiesMethod = server.getClass().getMethod("getSaveProperties");
-                        Object saveProperties = getSavePropertiesMethod.invoke(server);
-                        if (saveProperties != null) {
-                            Method getDataConfigurationMethod = saveProperties.getClass().getMethod("getDataConfiguration");
-                            Object dataConfiguration = getDataConfigurationMethod.invoke(saveProperties);
-                            if (dataConfiguration != null) {
-                                Method getEnabledFeaturesMethod = dataConfiguration.getClass().getMethod("getEnabledFeatures");
-                                Object result = getEnabledFeaturesMethod.invoke(dataConfiguration);
-                                if (result != null && featureSetClass.isAssignableFrom(result.getClass())) {
-                                    featureSet = result;
-                                }
-                            }
-                        }
-                    } catch (Exception e) {}
-                    
-                    if (featureSet == null) {
-                        try {
-                            var worlds = server.getAllLevels();
-                            var worldIterator = worlds.iterator();
-                            if (worldIterator.hasNext()) {
-                                var world = worldIterator.next();
-                                Method getEnabledFeaturesMethod = world.getClass().getMethod("getEnabledFeatures");
-                                Object result = getEnabledFeaturesMethod.invoke(world);
-                                if (result != null && featureSetClass.isAssignableFrom(result.getClass())) {
-                                    featureSet = result;
-                                }
-                            }
-                        } catch (Exception e) {}
-                    }
-                    
-                    if (featureSet != null) {
-                        brewingRegistry = createMethod.invoke(null, featureSet);
-                    } else {
-                        try {
-                            java.lang.reflect.Field[] featureSetFields = featureSetClass.getDeclaredFields();
-                            for (java.lang.reflect.Field field : featureSetFields) {
-                                if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) 
-                                    && java.lang.reflect.Modifier.isFinal(field.getModifiers())
-                                    && "EMPTY".equals(field.getName())
-                                    && featureSetClass.isAssignableFrom(field.getType())) {
-                                    field.setAccessible(true);
-                                    Object emptyFeatureSet = field.get(null);
-                                    if (emptyFeatureSet != null) {
-                                        featureSet = emptyFeatureSet;
-                                        brewingRegistry = createMethod.invoke(null, emptyFeatureSet);
-                                        break;
-                                    }
-                                }
-                            }
-                        } catch (Exception e) {}
-                    }
-                }
-                
-                if (brewingRegistry != null) {
-                    try {
-                        Method registerDefaultsMethod = null;
-                        try {
-                            registerDefaultsMethod = brewingRecipeRegistryClass.getMethod("registerDefaults");
-                        } catch (NoSuchMethodException e) {
-                            for (Method method : brewingRecipeRegistryClass.getMethods()) {
-                                if (method.getName().equals("registerDefaults")) {
-                                    registerDefaultsMethod = method;
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        if (registerDefaultsMethod != null) {
-                            registerDefaultsMethod.setAccessible(true);
-                            if (registerDefaultsMethod.getParameterCount() == 0) {
-                                registerDefaultsMethod.invoke(brewingRegistry);
-                            } else if (featureSet != null) {
-                                registerDefaultsMethod.invoke(brewingRegistry, featureSet);
-                            }
-                        }
-                    } catch (Exception e) {}
-                }
-            } catch (Exception e) {
-                LOGGER.error("[BREWING] Erreur de création de BrewingRecipeRegistry: {}", e.getMessage(), e);
-                return;
-            }
-            
-            if (brewingRegistry == null) {
-                LOGGER.error("[BREWING] Aucune instance de BrewingRecipeRegistry");
-                return;
-            }
-            
+
             List<Item> potionItems = List.of(Items.POTION, Items.SPLASH_POTION, Items.LINGERING_POTION, Items.TIPPED_ARROW);
             List<Item> brewingIngredients = List.of(
                     Items.NETHER_WART,
@@ -278,50 +133,52 @@ public class BrewingRecipeManager {
                     Items.TURTLE_HELMET,
                     Items.PHANTOM_MEMBRANE
             );
-            
+
             var allPotions = new java.util.ArrayList<net.minecraft.core.Holder<net.minecraft.world.item.alchemy.Potion>>();
             for (var key : BuiltInRegistries.POTION.registryKeySet()) {
                 BuiltInRegistries.POTION.get(key).ifPresent(allPotions::add);
             }
             int totalRecipes = 0;
-            
+
             for (var potionEntry : allPotions) {
                 for (Item potionItem : potionItems) {
                     ItemStack inputPotion = new ItemStack(potionItem, 1);
-                    PotionContents potionContents = new PotionContents(potionEntry);
-                    inputPotion.set(DataComponents.POTION_CONTENTS, potionContents);
-                    
+                    inputPotion.set(DataComponents.POTION_CONTENTS, new PotionContents(potionEntry));
+
                     for (Item ingredientItem : brewingIngredients) {
                         ItemStack ingredient = new ItemStack(ingredientItem, 1);
-                        try {
-                            Boolean hasRecipe = (Boolean) hasRecipeMethod.invoke(brewingRegistry, inputPotion, ingredient);
-                            if (Boolean.TRUE.equals(hasRecipe)) {
-                                ItemStack result = (ItemStack) craftMethod.invoke(brewingRegistry, inputPotion, ingredient);
-                                if (!result.isEmpty()) {
-                                    Identifier resultId = FavoriteItemsManager.getUniqueItemId(result);
-                                    cache.computeIfAbsent(resultId, k -> new ArrayList<>()).add(
-                                        new BrewingRecipe(inputPotion.copy(), ingredient.copy(), result.copy())
-                                    );
-                                    totalRecipes++;
-                                }
-                            }
-                        } catch (Exception e) {}
+                        // hasMix prend (potion, ingredient), mix prend (ingredient, potion).
+                        if (!brewing.hasMix(inputPotion, ingredient)) {
+                            continue;
+                        }
+                        ItemStack result = brewing.mix(ingredient, inputPotion);
+                        if (result == null || result.isEmpty()) {
+                            continue;
+                        }
+                        Identifier resultId = FavoriteItemsManager.getUniqueItemId(result);
+                        cache.computeIfAbsent(resultId, k -> new ArrayList<>()).add(
+                                new BrewingRecipe(inputPotion.copy(), ingredient.copy(), result.copy()));
+                        totalRecipes++;
                     }
                 }
             }
-            
+
             isCacheBuilt = true;
-            LOGGER.info("[BREWING] Cache des recettes de brewing construit avec succès en {} ms. {} recettes indexées.", 
-                        System.currentTimeMillis() - startTime, totalRecipes);
-            
-        } catch (Exception e) {
-            LOGGER.error("[BREWING] Erreur inattendue pendant la construction du cache", e);
+            LOGGER.info("[BREWING] Cache construit en {} ms, {} recettes indexees.",
+                    System.currentTimeMillis() - startTime, totalRecipes);
+
+        } catch (Exception | LinkageError e) {
+            // 26.3 a supprime PotionBrewing : le brassage y est devenu un vrai
+            // type de recette (BrewingRecipe), deja couvert par le pipeline de
+            // recettes. On degrade en une ligne au lieu de reessayer sans fin.
+            isCacheBuilt = true;
+            LOGGER.warn("[BREWING] API de brassage indisponible sur cette version ({}). "
+                    + "En 26.3 les recettes de brassage passent par le pipeline de recettes.", e.toString());
         }
     }
 
     /**
-     * Trouve les recettes de brewing qui produisent l'ItemStack spécifié.
-     * Récupère les recettes depuis le serveur si disponible.
+     * Trouve les recettes de brassage qui produisent l'ItemStack specifie.
      */
     public List<BrewingRecipe> getRecipesForOutput(ItemStack output) {
         ensureCacheBuilt();

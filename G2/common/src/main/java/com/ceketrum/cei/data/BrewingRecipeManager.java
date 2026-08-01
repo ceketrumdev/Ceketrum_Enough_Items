@@ -4,6 +4,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.recipe.BrewingRecipeRegistry;
 import net.minecraft.potion.Potion;
 import net.minecraft.potion.PotionUtil;
 import net.minecraft.registry.Registries;
@@ -50,65 +51,36 @@ public class BrewingRecipeManager {
         return instance;
     }
 
+    /**
+     * Construit le cache des recettes de brassage.
+     *
+     * L'API est appelee DIRECTEMENT, sans reflexion. L'ancien code passait par
+     * Class.forName sur des noms Minecraft, ce qui ne pouvait pas aboutir : sous
+     * Fabric le jeu tourne en mappings intermediary et Loom ne remappe pas le
+     * contenu des chaines. L'onglet brassage etait donc vide depuis toujours.
+     *
+     * Attention a l'ordre des arguments, releve au bytecode et NON symetrique :
+     *     hasRecipe(potion, ingredient)  --  teste POTION_TYPE_PREDICATE sur le 1er argument
+     *     craft(ingredient, potion)      --  lit PotionUtil.getPotion() sur le 2e
+     */
     private void ensureCacheBuilt() {
-        if (isCacheBuilt) return;
-        
-        MinecraftServer server = null;
-        try {
-            // Utiliser la réflexion pour récupérer le serveur sans dépendances directes
-            var client = MinecraftClient.getInstance();
-            if (client != null) {
-                server = client.getServer();
-            }
-        } catch (Exception e) {}
-        
-        if (server == null) {
-            attempts++;
-            if (attempts >= MAX_ATTEMPTS) {
-                isCacheBuilt = true;
-                LOGGER.warn("[BREWING] Nombre maximum de tentatives d'accès au serveur atteint en solo. Skip.");
-            }
+        if (isCacheBuilt) {
             return;
         }
-        
-        try {
-            LOGGER.info("[BREWING] Début de la construction du cache des recettes de brewing...");
-            long startTime = System.currentTimeMillis();
-            
-            cache.clear();
-            
-            // Récupérer le BrewingRecipeRegistry du serveur via réflexion
-            // En 1.20.1/1.20.4, le BrewingRecipeRegistry a des méthodes statiques et des instances
-            // On peut interroger le registre de potions vanilla ou utiliser les méthodes du jeu.
-            // On utilise la classe BrewingRecipeRegistry directement.
-            Class<?> brewingRegistryClass = Class.forName("net.minecraft.recipe.BrewingRecipeRegistry");
-            
-            // Méthode de vérification et de craft
-            // En Yarn 1.20.1/1.20.4 :
-            // boolean hasRecipe(ItemStack input, ItemStack ingredient)
-            // ItemStack craft(ItemStack input, ItemStack ingredient)
-            // On cherche ces méthodes via réflexion
-            Method hasRecipeMethod = null;
-            Method craftMethod = null;
-            Object brewingRegistry = null;
-            
-            // Essayer d'abord la méthode statique directe ou l'instance
-            for (Method m : brewingRegistryClass.getDeclaredMethods()) {
-                if (m.getName().equals("hasRecipe") || m.getName().equals("method_8076")) {
-                    m.setAccessible(true);
-                    hasRecipeMethod = m;
-                } else if (m.getName().equals("craft") || m.getName().equals("method_8071")) {
-                    m.setAccessible(true);
-                    craftMethod = m;
-                }
-            }
-            
-            if (hasRecipeMethod == null || craftMethod == null) {
-                LOGGER.error("[BREWING] Impossible de trouver les méthodes hasRecipe ou craft sur BrewingRecipeRegistry.");
-                return;
-            }
 
-            // Générer la liste des entrées possibles
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.world == null) {
+            return;
+        }
+
+        try {
+            long startTime = System.currentTimeMillis();
+            cache.clear();
+
+            // Contrairement aux versions Mojmap, ou les melanges vivent cote
+            // serveur, BrewingRecipeRegistry est ici statique et renseigne au
+            // demarrage : pas besoin du serveur integre, et ca marche donc aussi
+            // en multijoueur.
             List<Item> potionItems = Arrays.asList(Items.POTION, Items.SPLASH_POTION, Items.LINGERING_POTION);
             List<Item> brewingIngredients = Arrays.asList(
                     Items.NETHER_WART,
@@ -129,44 +101,46 @@ public class BrewingRecipeManager {
                     Items.PHANTOM_MEMBRANE,
                     Items.TURTLE_HELMET
             );
-            
-            // Ajouter d'autres ingrédients communs trouvés dans le registre si nécessaire
+
             var allPotions = Registries.POTION.streamEntries().toList();
             int totalRecipes = 0;
-            
+
             for (var potionEntry : allPotions) {
                 for (Item potionItem : potionItems) {
                     ItemStack inputPotion = new ItemStack(potionItem, 1);
                     PotionUtil.setPotion(inputPotion, potionEntry.value());
-                    
+
                     for (Item ingredientItem : brewingIngredients) {
                         ItemStack ingredient = new ItemStack(ingredientItem, 1);
-                        try {
-                            Boolean hasRecipe = (Boolean) hasRecipeMethod.invoke(null, inputPotion, ingredient);
-                            if (Boolean.TRUE.equals(hasRecipe)) {
-                                ItemStack result = (ItemStack) craftMethod.invoke(null, inputPotion, ingredient);
-                                if (!result.isEmpty()) {
-                                    Identifier resultId = FavoriteItemsManager.getUniqueItemId(result);
-                                    cache.computeIfAbsent(resultId, k -> new ArrayList<>()).add(
-                                        new BrewingRecipe(inputPotion.copy(), ingredient.copy(), result.copy())
-                                    );
-                                    totalRecipes++;
-                                }
-                            }
-                        } catch (Exception e) {}
+                        // hasRecipe prend (potion, ingredient), craft prend (ingredient, potion).
+                        if (!BrewingRecipeRegistry.hasRecipe(inputPotion, ingredient)) {
+                            continue;
+                        }
+                        ItemStack result = BrewingRecipeRegistry.craft(ingredient, inputPotion);
+                        if (result == null || result.isEmpty()) {
+                            continue;
+                        }
+                        Identifier resultId = FavoriteItemsManager.getUniqueItemId(result);
+                        cache.computeIfAbsent(resultId, k -> new ArrayList<>()).add(
+                                new BrewingRecipe(inputPotion.copy(), ingredient.copy(), result.copy()));
+                        totalRecipes++;
                     }
                 }
             }
-            
+
             isCacheBuilt = true;
-            LOGGER.info("[BREWING] Cache des recettes de brewing construit avec succès en {} ms. {} recettes indexées.", 
-                        System.currentTimeMillis() - startTime, totalRecipes);
-            
-        } catch (Exception e) {
-            LOGGER.error("[BREWING] Erreur inattendue pendant la construction du cache", e);
+            LOGGER.info("[BREWING] Cache construit en {} ms, {} recettes indexees.",
+                    System.currentTimeMillis() - startTime, totalRecipes);
+
+        } catch (Exception | LinkageError e) {
+            isCacheBuilt = true;
+            LOGGER.warn("[BREWING] API de brassage indisponible ({}).", e.toString());
         }
     }
 
+    /**
+     * Trouve les recettes de brassage qui produisent l'ItemStack specifie.
+     */
     public List<BrewingRecipe> getRecipesForOutput(ItemStack output) {
         ensureCacheBuilt();
         Identifier outputId = FavoriteItemsManager.getUniqueItemId(output);

@@ -47,6 +47,14 @@ public class CeiConfig {
     
     // Popup d'aide
     private boolean showHelpPopup = true;
+
+    /**
+     * Nouveau pipeline de recettes (CeiRecipeView) : la grille est dimensionnee
+     * sur la recette au lieu d'etre supposee 3x3, et la station de travail est
+     * derivee du type de recette. L'ancien chemin reste en place derriere ce
+     * drapeau, le temps de comparer les deux rendus.
+     */
+    private boolean useNewRecipeRenderer = true;
     
     private CeiConfig() {
         Path configDir = PlatformHelper.getConfigDirectory().resolve("cei");
@@ -104,6 +112,9 @@ public class CeiConfig {
             
             // Popup d'aide
             if (json.has("showHelpPopup")) showHelpPopup = json.get("showHelpPopup").getAsBoolean();
+
+            // Nouveau pipeline de recettes (cf. CeiRecipeAdapter)
+            if (json.has("useNewRecipeRenderer")) useNewRecipeRenderer = json.get("useNewRecipeRenderer").getAsBoolean();
             
             LOGGER.info("Configuration chargée depuis {}", configFile);
         } catch (Exception e) {
@@ -142,6 +153,7 @@ public class CeiConfig {
             
             // Popup d'aide
             json.addProperty("showHelpPopup", showHelpPopup);
+            json.addProperty("useNewRecipeRenderer", useNewRecipeRenderer);
             
             Files.writeString(configFile, json.toString());
             LOGGER.debug("Configuration sauvegardée dans {}", configFile);
@@ -213,6 +225,9 @@ public class CeiConfig {
     public void setShowFavoritesByDefault(boolean showFavoritesByDefault) { this.showFavoritesByDefault = showFavoritesByDefault; }
     
     // Getters et setters pour la popup d'aide
+    public boolean isUseNewRecipeRenderer() { return useNewRecipeRenderer; }
+    public void setUseNewRecipeRenderer(boolean v) { this.useNewRecipeRenderer = v; }
+
     public boolean isShowHelpPopup() { return showHelpPopup; }
     public void setShowHelpPopup(boolean showHelpPopup) { this.showHelpPopup = showHelpPopup; }
     
@@ -233,6 +248,7 @@ public class CeiConfig {
         animationSpeed = 1.0f;
         showFavoritesByDefault = false;
         showHelpPopup = true;
+        useNewRecipeRenderer = true;
         save();
     }
 }

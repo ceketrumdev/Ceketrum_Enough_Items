@@ -79,6 +79,43 @@ public abstract class CeiKeyboardInjectionMixin {
         }
     }
 
+    /**
+     * 26.3 : SDL3 remplace le callback caractere de GLFW.
+     *
+     * KeyboardHandler y gagne textInput(long, String) et n'appelle plus
+     * charTyped(long, CharacterEvent) -- qui existe pourtant toujours, d'ou un
+     * bug invisible en 26.1/26.2 et une barre de recherche muette en 26.3.
+     *
+     * Le module est compile contre 26.2, ou textInput n'existe pas : avec
+     * require = 0 l'injection y est simplement ignoree. On annule l'evenement
+     * quand il est consomme, ce qui evite au passage toute double saisie si une
+     * version faisait passer textInput par charTyped.
+     */
+    @Inject(
+        method = "textInput",
+        at = @At("HEAD"),
+        cancellable = true,
+        require = 0
+    )
+    private void cei$onTextInput(long window, String text, CallbackInfo ci) {
+        if (text == null || text.isEmpty()) return;
+        if (com.ceketrum.cei.gui.util.CeiScreens.current() instanceof AbstractContainerScreen<?> screen
+                && !(screen instanceof CreativeModeInventoryScreen)) {
+            CeiModule module = CeiScreenHelper.getOrCreateModule(screen);
+            boolean handled = false;
+            for (int i = 0; i < text.length(); ) {
+                int codepoint = text.codePointAt(i);
+                i += Character.charCount(codepoint);
+                // La barre de recherche travaille sur des char : on laisse
+                // passer ce qui sort du plan multilingue de base.
+                if (Character.isBmpCodePoint(codepoint) && module.handleCharTyped((char) codepoint, 0)) {
+                    handled = true;
+                }
+            }
+            if (handled) ci.cancel();
+        }
+    }
+
     @Inject(
         method = "charTyped",
         at = @At("HEAD"),

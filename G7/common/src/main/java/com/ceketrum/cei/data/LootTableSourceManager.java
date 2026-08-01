@@ -67,6 +67,34 @@ public class LootTableSourceManager {
      */
     private volatile boolean cei$degraded = false;
 
+    /**
+     * Registre des loot tables, quelle que soit la version de la plage 26.x.
+     *
+     * Jusqu'en 26.2, server.registryAccess() exposait minecraft:loot_table.
+     * En 26.3 ce n'est plus le cas : les tables ne vivent plus que dans les
+     * registres rechargeables, d'ou le "Missing registry: minecraft:loot_table"
+     * repete. On interroge donc ReloadableServerRegistries en premier -- c'est
+     * l'emplacement canonique des loot tables depuis 1.21.2 -- et on retombe sur
+     * registryAccess() pour le reste de la plage.
+     *
+     * Les deux appels ont ete verifies dans le jar 26.2 et dans le jar 26.3 :
+     * Holder.lookup() y renvoie le meme HolderLookup.Provider.
+     */
+    private static net.minecraft.core.HolderLookup.RegistryLookup<LootTable> cei$lootTableLookup(MinecraftServer server) {
+        if (server == null) return null;
+        try {
+            return server.reloadableRegistries().lookup()
+                    .lookupOrThrow(net.minecraft.core.registries.Registries.LOOT_TABLE);
+        } catch (Exception | LinkageError e) {
+            try {
+                return server.registryAccess()
+                        .lookupOrThrow(net.minecraft.core.registries.Registries.LOOT_TABLE);
+            } catch (Exception | LinkageError e2) {
+                return null;
+            }
+        }
+    }
+
     public synchronized void ensureCacheBuilt() {
         if (cei$degraded) {
             return;
@@ -106,9 +134,13 @@ public class LootTableSourceManager {
         }
         
         try {
-            var registryManager = server.registryAccess();
-            var lootTableRegistry = registryManager.lookupOrThrow(net.minecraft.core.registries.Registries.LOOT_TABLE);
-            if (lootTableRegistry == null) return;
+            var lootTableRegistry = cei$lootTableLookup(server);
+            if (lootTableRegistry == null) {
+                cei$degraded = true;
+                isCacheBuilt = true;
+                LOGGER.warn("[LOOT] Aucun registre de loot tables accessible sur cette version : scan desactive.");
+                return;
+            }
             
             LOGGER.info("[LOOT] Début du scan global des loot tables...");
             long startTime = System.currentTimeMillis();
@@ -139,7 +171,12 @@ public class LootTableSourceManager {
                         System.currentTimeMillis() - startTime, scannedTables, globalLootCache.size());
             
         } catch (Exception e) {
-            LOGGER.error("[LOOT] Erreur lors du scan global des loot tables: {}", e.getMessage(), e);
+            // On marque le cache comme construit meme en cas d'echec. Cette
+            // methode est appelee depuis le rendu : sans ce drapeau, un echec se
+            // repetait a chaque frame et noyait le log sous plusieurs centaines
+            // de stacktraces par seconde.
+            isCacheBuilt = true;
+            LOGGER.error("[LOOT] Scan global des loot tables abandonne : {}", e.getMessage(), e);
         }
     }
     
@@ -315,8 +352,7 @@ public class LootTableSourceManager {
             if (client != null && client.player != null) {
                 MinecraftServer server = client.getSingleplayerServer();
                 if (server != null) {
-                    var registryManager = server.registryAccess();
-                    var lootTableRegistry = registryManager.lookupOrThrow(net.minecraft.core.registries.Registries.LOOT_TABLE);
+                    var lootTableRegistry = cei$lootTableLookup(server);
                     if (lootTableRegistry != null) {
                         LootTable table = lootTableRegistry.get(id).map(net.minecraft.core.Holder::value).orElse(null);
                         if (table != null && table != LootTable.EMPTY) {
