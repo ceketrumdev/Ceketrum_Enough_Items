@@ -20,27 +20,47 @@ import java.util.*;
  */
 public class LootTableSourceManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("cei-loot-tables");
-    
+
     private static LootTableSourceManager instance;
-    
-    // Cache global inverse : Item -> Noms des sources d'obtention
-    private final Map<Item, List<String>> globalLootCache = new HashMap<>();
-    private final Map<Item, Set<Identifier>> itemToLootIds = new HashMap<>();
+
+    // Index inverse : Item -> identifiants des tables qui le produisent.
+    // On ne retient QUE des Identifier, deja crees par le registre et donc
+    // partages : l'index ne fait qu'y renvoyer. Les libelles lisibles etaient
+    // auparavant stockes pour les ~1700 items indexes alors que le joueur n'en
+    // consulte qu'une poignee ; ils sont maintenant formates a la demande et
+    // memorises dans les deux caches ci-dessous.
+    private final Map<Item, List<Identifier>> itemToLootIds = new HashMap<>();
+    private final Map<Item, List<String>> sourceNameCache = new HashMap<>();
+    private final Map<Item, List<String>> worldLocationCache = new HashMap<>();
+
+    // Les libelles dependent de la langue : on les jette si elle change.
+    private String memoLanguage;
+
+    /**
+     * Cache des champs a explorer, par classe.
+     *
+     * getDeclaredFields() ne renvoie pas le tableau interne de la classe : il
+     * en RECOPIE le tableau et chaque objet Field, a chaque appel. L'ancien
+     * scan l'appelait pour chaque objet rencontre et pour chaque classe de sa
+     * hierarchie -- de l'ordre du million de Field jetables. Une classe donnee
+     * n'est desormais analysee qu'une seule fois.
+     */
+    private static final Map<Class<?>, java.lang.reflect.Field[]> FIELD_CACHE = new HashMap<>();
     private boolean isCacheBuilt = false;
     private int attempts = 0;
     private static final int MAX_ATTEMPTS = 5;
-    
+
     private LootTableSourceManager() {
         // Chargement à la demande
     }
-    
+
     public static LootTableSourceManager getInstance() {
         if (instance == null) {
             instance = new LootTableSourceManager();
         }
         return instance;
     }
-    
+
     /**
      * Recherche récursivement un champ dans une classe et ses superclasses.
      */
@@ -55,28 +75,30 @@ public class LootTableSourceManager {
         }
         throw new NoSuchFieldException(fieldName + " in " + clazz.getName());
     }
-    
+
     /**
      * Construit le cache global des loot tables en scannant le registre du serveur.
      * Cette opération ne s'exécute qu'une seule fois par chargement de monde en moins de 10 ms.
      */
     public synchronized void ensureCacheBuilt() {
         if (isCacheBuilt) return;
-        
+
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null || client.world == null) return;
-        
+
         // En multijoueur, on n'a pas accès à l'integrated server. On skip le scan de loot tables pour éviter les spams/lags
         if (!client.isInSingleplayer()) {
             isCacheBuilt = true;
             LOGGER.info("[LOOT] Client en multijoueur, skip du scan global de loot tables (fallbacks locaux activés).");
             return;
         }
-        
-        MinecraftServer server = null;
-        if (client.player != null) {
-            server = client.player.getServer();
-        }
+
+        // client.player.getServer() delegue a ClientWorld.getServer(), qui
+        // renvoie null cote client : le scan echouait donc systematiquement et
+        // se desactivait au bout de MAX_ATTEMPTS.
+        // En Yarn le serveur integre s'obtient par MinecraftClient.getServer()
+        // -- getSingleplayerServer() est le nom Mojang, valable a partir de G3.
+        MinecraftServer server = client.getServer();
         if (server == null) {
             attempts++;
             if (attempts >= MAX_ATTEMPTS) {
@@ -85,37 +107,52 @@ public class LootTableSourceManager {
             }
             return;
         }
-        
+
         try {
             var lootManager = server.getLootManager();
             if (lootManager == null) return;
-            
+
             LOGGER.info("[LOOT] Début du scan global des loot tables...");
             long startTime = System.currentTimeMillis();
-            
-            globalLootCache.clear();
+
             itemToLootIds.clear();
+            sourceNameCache.clear();
+            worldLocationCache.clear();
             int scannedTables = 0;
-            
-            Collection<Identifier> ids = lootManager.getIds(net.minecraft.loot.LootDataType.LOOT_TABLES);
-            for (Identifier id : ids) {
+
+            // Deux tampons pour tout le scan au lieu de deux par table.
+            // L'ensemble anti-cycle est un ensemble d'IDENTITE : il ne declenche
+            // plus hashCode()/equals() sur des objets Minecraft (couteux, et
+            // faux ici -- deux entrees egales mais distinctes s'eliminaient).
+            Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+            Set<Item> itemsInTable = new HashSet<>();
+
+            Collection<Identifier> tableIds = lootManager.getIds(net.minecraft.loot.LootDataType.LOOT_TABLES);
+            for (Identifier id : tableIds) {
                 LootTable lootTable = (LootTable) lootManager.getElement(new net.minecraft.loot.LootDataKey<>(net.minecraft.loot.LootDataType.LOOT_TABLES, id));
                 if (lootTable != null && lootTable != LootTable.EMPTY) {
                     scannedTables++;
-                    Set<Item> itemsInTable = findItemsInLootTable(lootTable);
-                    String sourceName = formatLootTableName(id);
-                    
+                    visited.clear();
+                    itemsInTable.clear();
+                    scanObjectRecursively(lootTable, itemsInTable, visited, 0);
+
                     for (Item item : itemsInTable) {
-                        globalLootCache.computeIfAbsent(item, k -> new ArrayList<>()).add(sourceName);
-                        itemToLootIds.computeIfAbsent(item, k -> new LinkedHashSet<>()).add(id);
+                        // ArrayList et non LinkedHashSet : quelques entrees par
+                        // item, un contains() lineaire coute moins cher qu'une
+                        // table de hachage -- et bien moins en memoire.
+                        List<Identifier> ids =
+                                itemToLootIds.computeIfAbsent(item, k -> new ArrayList<>(2));
+                        if (!ids.contains(id)) {
+                            ids.add(id);
+                        }
                     }
                 }
             }
-            
+
             isCacheBuilt = true;
-            LOGGER.info("[LOOT] Scan global terminé en {} ms. {} loot tables scannées, {} items indexés.", 
-                        System.currentTimeMillis() - startTime, scannedTables, globalLootCache.size());
-            
+            LOGGER.info("[LOOT] Scan global terminé en {} ms. {} loot tables scannées, {} items indexés.",
+                        System.currentTimeMillis() - startTime, scannedTables, itemToLootIds.size());
+
         } catch (Exception e) {
             // On marque le cache comme construit meme en cas d'echec. Cette
             // methode est appelee depuis le rendu : sans ce drapeau, un echec se
@@ -125,37 +162,39 @@ public class LootTableSourceManager {
             LOGGER.error("[LOOT] Scan global des loot tables abandonne : {}", e.getMessage(), e);
         }
     }
-    
+
     /**
      * Parcourt récursivement une LootTable pour trouver tous les items qu'elle peut générer.
      */
     private Set<Item> findItemsInLootTable(LootTable lootTable) {
         Set<Item> items = new HashSet<>();
         if (lootTable != null && lootTable != LootTable.EMPTY) {
-            scanObjectRecursively(lootTable, items, new HashSet<>(), 0);
+            scanObjectRecursively(lootTable, items,
+                    Collections.newSetFromMap(new IdentityHashMap<>()), 0);
         }
         return items;
     }
-    
+
     private void collectItemsFromEntry(Object entry, Set<Item> items) {
         if (entry == null) return;
-        scanObjectRecursively(entry, items, new HashSet<>(), 0);
+        scanObjectRecursively(entry, items,
+                Collections.newSetFromMap(new IdentityHashMap<>()), 0);
     }
-    
+
     /**
      * Parcourt récursivement et de façon omnisciente n'importe quel objet de loot
-     * pour y extraire tous les items, stacks, tags ou tables de loot imbriquées, 
+     * pour y extraire tous les items, stacks, tags ou tables de loot imbriquées,
      * ce qui assure une compatibilité à 100% avec les entries moddées customisées.
      */
     private void scanObjectRecursively(Object obj, Set<Item> items, Set<Object> visited, int depth) {
         if (obj == null || depth > 8) return;
         if (!visited.add(obj)) return; // Protection contre les cycles infinis
-        
+
         Class<?> clazz = obj.getClass();
         String className = clazz.getName();
-        
+
         // Ignorer les classes système lourdes ou de réseau pour la sécurité et la performance
-        if (className.startsWith("java.lang.ClassLoader") || 
+        if (className.startsWith("java.lang.ClassLoader") ||
             className.startsWith("java.lang.Thread") ||
             className.contains("MinecraftClient") ||
             className.contains("MinecraftServer") ||
@@ -165,13 +204,13 @@ public class LootTableSourceManager {
             className.contains("Level")) {
             return;
         }
-        
+
         // 1. Extraction directe d'Item
         if (obj instanceof Item) {
             items.add((Item) obj);
             return;
         }
-        
+
         // 2. Extraction d'ItemStack
         if (obj instanceof ItemStack stack) {
             if (!stack.isEmpty()) {
@@ -179,7 +218,7 @@ public class LootTableSourceManager {
             }
             return;
         }
-        
+
         // 3. Unpacking de RegistryEntry (ex: RegistryEntry<Item> ou RegistryEntry<LootTable>)
         if (obj instanceof net.minecraft.registry.entry.RegistryEntry<?> entry) {
             try {
@@ -191,7 +230,7 @@ public class LootTableSourceManager {
                     scanObjectRecursively(value, items, visited, depth + 1);
                 }
             } catch (Exception e) {}
-            
+
             // Tenter également d'extraire la clé du RegistryEntry en cas d'ID direct
             try {
                 Method getKeyMethod = obj.getClass().getMethod("getKey");
@@ -209,7 +248,7 @@ public class LootTableSourceManager {
             } catch (Exception e) {}
             return;
         }
-        
+
         // 4. Résolution de TagKey d'items
         if (obj instanceof net.minecraft.registry.tag.TagKey<?> tagKey) {
             try {
@@ -226,7 +265,7 @@ public class LootTableSourceManager {
             } catch (Exception e) {}
             return;
         }
-        
+
         // 5. Résolution d'Identifier direct (ex: ID de loot table imbriquée)
         if (obj instanceof Identifier id) {
             if (id.getPath().contains("loot_tables/") || id.getPath().contains("chests/") || id.getPath().contains("entities/")) {
@@ -234,7 +273,7 @@ public class LootTableSourceManager {
             }
             return;
         }
-        
+
         // 6. Traitement des tableaux
         if (clazz.isArray()) {
             try {
@@ -246,7 +285,7 @@ public class LootTableSourceManager {
             } catch (Exception e) {}
             return;
         }
-        
+
         // 7. Traitement des Collections (List, Set, etc.)
         if (obj instanceof Collection<?> collection) {
             for (Object element : collection) {
@@ -254,7 +293,7 @@ public class LootTableSourceManager {
             }
             return;
         }
-        
+
         // 8. Traitement des Maps
         if (obj instanceof Map<?,?> map) {
             for (Object key : map.keySet()) {
@@ -265,38 +304,107 @@ public class LootTableSourceManager {
             }
             return;
         }
-        
-        // 9. Parcours par réflexion récursive de tous les champs de l'objet
-        Class<?> current = clazz;
-        while (current != null && current != Object.class) {
+
+        // 8 bis. Optional. Indispensable depuis que le parcours de champs
+        // n'entre plus dans les classes du paquet java.* : sans ce cas, les
+        // valeurs facultatives des loot tables deviendraient invisibles.
+        if (obj instanceof Optional<?> optional) {
+            if (optional.isPresent()) {
+                scanObjectRecursively(optional.get(), items, visited, depth + 1);
+            }
+            return;
+        }
+
+        // 9. Parcours par réflexion récursive des champs de l'objet.
+        //    La liste des champs utiles est calculee une fois par classe (voir
+        //    FIELD_CACHE) : c'est la correction qui supprime l'essentiel des
+        //    108 Mio mesures sur G4.
+        for (java.lang.reflect.Field field : scannableFields(clazz)) {
             try {
-                java.lang.reflect.Field[] fields = current.getDeclaredFields();
-                for (java.lang.reflect.Field field : fields) {
-                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
-                        continue;
-                    }
-                    field.setAccessible(true);
-                    Object fieldValue = field.get(obj);
-                    if (fieldValue != null) {
-                        scanObjectRecursively(fieldValue, items, visited, depth + 1);
-                    }
+                Object fieldValue = field.get(obj);
+                if (fieldValue != null) {
+                    scanObjectRecursively(fieldValue, items, visited, depth + 1);
                 }
             } catch (Exception e) {
                 // Ignorer les échecs d'accès sécurité
             }
-            current = current.getSuperclass();
         }
     }
-    
+
     /**
-     * Résout un Identifier de Loot Table en objet LootTable réel sur le serveur de jeu, 
+     * Champs d'instance d'une classe susceptibles de mener a un item, toutes
+     * superclasses confondues, rendus accessibles une fois pour toutes.
+     */
+    private static synchronized java.lang.reflect.Field[] scannableFields(Class<?> clazz) {
+        java.lang.reflect.Field[] cached = FIELD_CACHE.get(clazz);
+        if (cached != null) {
+            return cached;
+        }
+        List<java.lang.reflect.Field> keep = new ArrayList<>();
+        Class<?> current = clazz;
+        while (current != null && current != Object.class) {
+            String pkg = current.getName();
+            // Les conteneurs de la bibliotheque standard sont deja traites plus
+            // haut (cas 6 a 8 bis) : descendre dans leurs entrailles ne
+            // rapporte rien et coute cher.
+            if (pkg.startsWith("java.") || pkg.startsWith("jdk.") || pkg.startsWith("sun.")) {
+                break;
+            }
+            try {
+                for (java.lang.reflect.Field field : current.getDeclaredFields()) {
+                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+                        continue;
+                    }
+                    if (!mayHoldItems(field.getType())) {
+                        continue;
+                    }
+                    try {
+                        field.setAccessible(true);
+                    } catch (Exception e) {
+                        continue;
+                    }
+                    keep.add(field);
+                }
+            } catch (Exception e) {
+                // Module ferme ou verificateur d'acces : on passe.
+            }
+            current = current.getSuperclass();
+        }
+        java.lang.reflect.Field[] result = keep.toArray(new java.lang.reflect.Field[0]);
+        FIELD_CACHE.put(clazz, result);
+        return result;
+    }
+
+    /**
+     * Un champ de ce type peut-il, meme indirectement, contenir un item ?
+     * Ecarte les primitifs et les valeurs scalaires : ils representent la
+     * majorite des champs d'une loot table (poids, rangs, bornes, drapeaux).
+     */
+    private static boolean mayHoldItems(Class<?> type) {
+        if (type.isPrimitive()) {
+            return false;
+        }
+        if (type.isArray()) {
+            return mayHoldItems(type.getComponentType()) || type.getComponentType() == Object.class;
+        }
+        if (type == String.class || type == Class.class || type == Boolean.class
+                || type == Character.class || Number.class.isAssignableFrom(type)
+                || Enum.class.isAssignableFrom(type)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Résout un Identifier de Loot Table en objet LootTable réel sur le serveur de jeu,
      * puis scanne cet objet de façon récursive pour en extraire tous les items.
      */
     private void resolveAndScanLootTable(Identifier id, Set<Item> items, Set<Object> visited, int depth) {
         try {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client != null && client.player != null) {
-                MinecraftServer server = client.player.getServer();
+                MinecraftServer server = client.getServer();
+                if (server != null) {
                     var lootManager = server.getLootManager();
                     if (lootManager != null) {
                         LootTable table = (LootTable) lootManager.getElement(new net.minecraft.loot.LootDataKey<>(net.minecraft.loot.LootDataType.LOOT_TABLES, id));
@@ -304,27 +412,58 @@ public class LootTableSourceManager {
                             scanObjectRecursively(table, items, visited, depth);
                         }
                     }
+                }
             }
         } catch (Exception e) {
             // Ignorer
         }
     }
-    
+
     /**
      * Trouve les sources de loot tables pour un item donné.
      */
     public List<String> getSourcesForItem(Item item) {
         ensureCacheBuilt();
-        
-        List<String> sources = globalLootCache.get(item);
-        if (sources != null && !sources.isEmpty()) {
-            return sources;
+        dropMemoIfLanguageChanged();
+
+        // Cette methode est appelee depuis le rendu : sans memoire, chaque
+        // frame reformatait les libelles ou reconstruisait la liste de secours.
+        List<String> memo = sourceNameCache.get(item);
+        if (memo != null) {
+            return memo;
         }
-        
-        // Fallback pour le mode multijoueur (integrated server null) ou les items non indexés
-        return getFallbackSources(item);
+
+        List<String> sources;
+        List<Identifier> ids = itemToLootIds.get(item);
+        if (ids != null && !ids.isEmpty()) {
+            sources = new ArrayList<>(ids.size());
+            for (Identifier id : ids) {
+                String name = formatLootTableName(id);
+                if (!sources.contains(name)) {
+                    sources.add(name);
+                }
+            }
+        } else {
+            // Fallback pour le mode multijoueur (integrated server null) ou les items non indexés
+            sources = getFallbackSources(item);
+        }
+        sourceNameCache.put(item, sources);
+        return sources;
     }
-    
+
+    /**
+     * Les libelles memorises sont traduits : ils ne valent que pour la langue
+     * active. Un changement de langue les invalide, l'index d'identifiants non.
+     */
+    private void dropMemoIfLanguageChanged() {
+        String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
+        if (memoLanguage == null || !memoLanguage.equals(lang)) {
+            memoLanguage = lang;
+            sourceNameCache.clear();
+            worldLocationCache.clear();
+        }
+    }
+
     /**
      * Formate un ID de loot table en nom lisible et plus immersif.
      */
@@ -334,11 +473,11 @@ public class LootTableSourceManager {
         if (parts.length > 1) {
             String category = parts[0];
             String name = parts[parts.length - 1].replace("_", " ");
-            
+
             if (!name.isEmpty()) {
                 name = Character.toUpperCase(name.charAt(0)) + name.substring(1);
             }
-            
+
             // Localisation et embellissement
             String categoryName = switch (category) {
                 case "chests" -> "Coffre";
@@ -348,13 +487,13 @@ public class LootTableSourceManager {
                 case "archaeology" -> "Fouilles";
                 default -> category;
             };
-            
+
             return name + " (" + categoryName + ")";
         }
-        
+
         return path.replace("_", " ");
     }
-    
+
     /**
      * Fournit une base de données de secours locale et localisée pour les items vanilla importants.
      * Cette base de données prend le relais en multijoueur ou lorsque le serveur n'est pas indexé.
@@ -362,13 +501,13 @@ public class LootTableSourceManager {
     private List<String> getFallbackSources(Item item) {
         String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
         boolean isFrench = lang != null && lang.toLowerCase().startsWith("fr");
-        
+
         Identifier id = Registries.ITEM.getId(item);
         if (id == null) return Collections.emptyList();
-        
+
         String path = id.getPath();
         List<String> sources = new ArrayList<>();
-        
+
         switch (path) {
             case "diamond":
                 sources.add(isFrench ? "Coffres de structures (Bastions, Forteresses, Temples du Désert, Mineshafts)" : "Structure chests (Bastions, Fortresses, Desert Temples, Mineshafts)");
@@ -536,19 +675,26 @@ public class LootTableSourceManager {
                 sources.add(isFrench ? "Looté par les Breezes (Chambres des Épreuves)" : "Dropped by Breezes (Trial Chambers)");
                 break;
         }
-        
+
         return sources;
     }
-    
+
     public List<String> getWorldLocationsForItem(Item item) {
+        ensureCacheBuilt();
+        dropMemoIfLanguageChanged();
+
+        List<String> memo = worldLocationCache.get(item);
+        if (memo != null) {
+            return memo;
+        }
+
         String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
         boolean isFrench = lang != null && lang.toLowerCase().startsWith("fr");
-        
+
         Set<String> locations = new LinkedHashSet<>();
-        
+
         // 1. Dynamic scan
-        ensureCacheBuilt();
-        Set<Identifier> ids = itemToLootIds.get(item);
+        List<Identifier> ids = itemToLootIds.get(item);
         if (ids != null) {
             for (Identifier id : ids) {
                 String loc = parseLocationFromLootId(id, isFrench);
@@ -557,19 +703,21 @@ public class LootTableSourceManager {
                 }
             }
         }
-        
+
         // 2. Fallbacks/Overrides
         List<String> fallbacks = getFallbackWorldLocations(item, isFrench);
         locations.addAll(fallbacks);
-        
+
         // If still empty, return Everywhere / Not specified
         if (locations.isEmpty()) {
             locations.add(isFrench ? "Partout dans le monde / Non spécifié" : "Everywhere / Not specified");
         }
-        
-        return new ArrayList<>(locations);
+
+        List<String> result = new ArrayList<>(locations);
+        worldLocationCache.put(item, result);
+        return result;
     }
-    
+
     private String parseLocationFromLootId(Identifier id, boolean isFrench) {
         String path = id.getPath();
         if (path.contains("desert_pyramid")) {
@@ -640,12 +788,12 @@ public class LootTableSourceManager {
         }
         return null;
     }
-    
+
     private List<String> getFallbackWorldLocations(Item item, boolean isFrench) {
         Identifier id = Registries.ITEM.getId(item);
         if (id == null) return Collections.emptyList();
         String path = id.getPath();
-        
+
         List<String> locs = new ArrayList<>();
         if (path.equals("diamond") || path.equals("diamond_ore") || path.equals("deepslate_diamond_ore")) {
             locs.add(isFrench ? "Sous-sol (Abysses Y < 0)" : "Underground (Deepslate Y < 0)");
@@ -691,15 +839,18 @@ public class LootTableSourceManager {
         }
         return locs;
     }
-    
+
     /**
      * Vide le cache des sources de loot tables.
      * Appelé lors du changement de monde ou du déchargement.
      */
     public void clearCache() {
-        globalLootCache.clear();
         itemToLootIds.clear();
+        sourceNameCache.clear();
+        worldLocationCache.clear();
+        memoLanguage = null;
         isCacheBuilt = false;
+        attempts = 0;
     }
 }
 

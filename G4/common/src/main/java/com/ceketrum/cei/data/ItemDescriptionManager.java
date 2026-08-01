@@ -131,7 +131,9 @@ public class ItemDescriptionManager {
         try {
             if (Minecraft.getInstance() != null && Minecraft.getInstance().getLanguageManager() != null) {
                 String languageCode = Minecraft.getInstance().getLanguageManager().getSelected();
-                LOGGER.info("Chargement des descriptions pour la langue: {}", languageCode);
+                // Pas de log ici : la garde de cache est DANS loadDescriptions.
+                // Journaliser avant elle laissait croire a une relecture du
+                // fichier a chaque ouverture d'ecran, alors qu'il n'en est rien.
                 loadDescriptions(languageCode);
             } else {
                 // Fallback vers en_us si le client n'est pas encore initialisé

@@ -32,7 +32,18 @@ public class CeiModule {
     
     private boolean isRecipePopupVisible = false;
     private ItemStack hoveredStack = null;
-    private List<ItemStack> allItemsCache = null;
+    /**
+     * Cache d'items PARTAGE.
+     *
+     * Il etait auparavant un champ d'instance, et CeiScreenHelper cree un
+     * CeiModule par ecran : le diagnostic a mesure +4 Mio de tas et ~1,5 ms a
+     * chaque ouverture de coffre, pour reconstruire une liste identique. Son
+     * contenu ne depend pas de l'ecran -- il n'y a aucune raison de le refaire.
+     *
+     * Vide par invalidateItemCache() a la connexion, quand le registre des items
+     * peut avoir change.
+     */
+    private static volatile List<ItemStack> sharedItemsCache = null;
     private List<ItemStack> filteredItemsCache = null;
     private String lastSearchText = "";
     private boolean hasCheckedHelpPopup = false;
@@ -49,7 +60,11 @@ public class CeiModule {
      */
     public void init() {
         // S'assurer que les descriptions sont chargées
-        ItemDescriptionManager.getInstance().reloadCurrentLanguageDescriptions();
+        // loadCurrentLanguageDescriptions() sort immediatement si la langue n'a
+        // pas change ; la variante reload() vidait currentLanguage et forcait la
+        // relecture du fichier a CHAQUE ouverture d'ecran -- visible dans le log
+        // sous forme de "Charge 10 descriptions" repete.
+        ItemDescriptionManager.getInstance().loadCurrentLanguageDescriptions();
         
         // Réinitialiser l'animation du panneau quand on ouvre l'inventaire
         panelRenderer.resetPanelOpenTime();
@@ -75,6 +90,7 @@ public class CeiModule {
                       Font textRenderer,
                       net.minecraft.world.item.crafting.RecipeManager recipeManager,
                       net.minecraft.core.RegistryAccess registryManager) {
+        long cei$frame = com.ceketrum.cei.diag.CeiDiagnostics.begin();
         // Rendre le panneau CEI (inclut la barre de recherche)
         panelRenderer.render(context, screenHeight, screenWidth, textRenderer, (double) mouseX, (double) mouseY);
         
@@ -145,6 +161,7 @@ public class CeiModule {
                 hoveredStack = null;
             }
         }
+        com.ceketrum.cei.diag.CeiDiagnostics.frame("Rendu du panneau", cei$frame);
     }
     
     /**
@@ -350,9 +367,19 @@ public class CeiModule {
      * Récupère tous les items du jeu, y compris les variantes avec Data Components.
      * Utilise un cache pour éviter de recréer la liste à chaque frame.
      */
+    /** Vide le cache partage. A appeler a la connexion a un monde. */
+    public static void invalidateItemCache() {
+        sharedItemsCache = null;
+    }
+
     private List<ItemStack> getAllItems() {
-        if (allItemsCache == null) {
-            allItemsCache = new ArrayList<>();
+        List<ItemStack> cached = sharedItemsCache;
+        if (cached != null) return cached;
+        synchronized (CeiModule.class) {
+            if (sharedItemsCache == null) {
+            long cei$t0 = com.ceketrum.cei.diag.CeiDiagnostics.begin();
+            long cei$h0 = com.ceketrum.cei.diag.CeiDiagnostics.heap();
+                List<ItemStack> built = new ArrayList<>();
             for (Item item : BuiltInRegistries.ITEM) {
                 try {
                     // Utiliser ItemVariantGenerator pour générer toutes les variantes de l'item
@@ -361,7 +388,7 @@ public class CeiModule {
                     for (ItemStack stack : variants) {
                         // Vérifier si la stack est valide et non vide
                         if (stack != null && !stack.isEmpty() && stack.getCount() > 0) {
-                            allItemsCache.add(stack);
+                                built.add(stack);
                         }
                     }
                 } catch (Exception e) {
@@ -369,8 +396,12 @@ public class CeiModule {
                     // Cela peut arriver pour certains items avec des constructeurs spéciaux
                 }
             }
+                com.ceketrum.cei.diag.CeiDiagnostics.end("Construction de la liste d'items", cei$t0, built.size(), "piles");
+                com.ceketrum.cei.diag.CeiDiagnostics.heapDelta("Liste d'items", cei$h0);
+                sharedItemsCache = built;
+            }
+            return sharedItemsCache;
         }
-        return allItemsCache;
     }
     
     /**
@@ -382,6 +413,7 @@ public class CeiModule {
         boolean showFavoritesOnly = panelRenderer.isShowFavoritesOnly();
         
         if (filteredItemsCache == null || !currentSearchText.equals(lastSearchText)) {
+            long cei$t0 = com.ceketrum.cei.diag.CeiDiagnostics.begin();
             List<ItemStack> allItems = getAllItems();
             filteredItemsCache = ItemFilter.filterItems(allItems, currentSearchText);
             
@@ -394,6 +426,8 @@ public class CeiModule {
             }
             
             lastSearchText = currentSearchText;
+            com.ceketrum.cei.diag.CeiDiagnostics.end("Filtrage [" + currentSearchText + "]", cei$t0,
+                    filteredItemsCache.size(), "resultats");
         }
         
         return filteredItemsCache;

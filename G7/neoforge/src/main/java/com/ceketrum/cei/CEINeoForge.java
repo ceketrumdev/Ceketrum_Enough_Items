@@ -43,6 +43,9 @@ public class CEINeoForge {
         @SubscribeEvent
         public static void registerGuiLayers(RegisterGuiLayersEvent event) {
             event.registerAbove(VanillaGuiLayers.HOTBAR, Identifier.fromNamespaceAndPath("cei", "hud"), (guiGraphics, deltaTracker) -> {
+            	// Prechauffage : 2 ms par frame, uniquement quand aucun ecran
+            	// n'est ouvert -- c'est-a-dire pendant que le joueur ne demande rien.
+            	com.ceketrum.cei.CeiWarmup.onClientFrame();
                 var client = Minecraft.getInstance();
                 if (com.ceketrum.cei.gui.util.CeiScreens.current() == null) {
                     var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
@@ -76,6 +79,8 @@ public class CEINeoForge {
             // La liste d'items est partagee entre les ecrans : on la reconstruit
             // a la connexion pour prendre en compte les items du serveur / des mods.
             com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
+            com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex.invalidate();
+            com.ceketrum.cei.CeiWarmup.reset();
             BrewingRecipeManager.getInstance().clearCache();
             LootTableSourceManager.getInstance().clearCache();
         }
@@ -85,6 +90,8 @@ public class CEINeoForge {
             // La liste d'items est partagee entre les ecrans : on la reconstruit
             // a la connexion pour prendre en compte les items du serveur / des mods.
             com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
+            com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex.invalidate();
+            com.ceketrum.cei.CeiWarmup.reset();
             BrewingRecipeManager.getInstance().clearCache();
             LootTableSourceManager.getInstance().clearCache();
         }

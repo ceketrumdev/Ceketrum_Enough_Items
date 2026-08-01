@@ -24,7 +24,7 @@ public class CEINeoForge {
     public CEINeoForge(IEventBus modEventBus) {
         // Register mod bus event subscribers
         modEventBus.register(ClientSetup.class);
-        
+
         // Register game bus event subscribers
         NeoForge.EVENT_BUS.register(GameplayEvents.class);
     }
@@ -43,6 +43,10 @@ public class CEINeoForge {
         @SubscribeEvent
         public static void registerGuiLayers(RegisterGuiLayersEvent event) {
             event.registerAbove(VanillaGuiLayers.HOTBAR, ResourceLocation.fromNamespaceAndPath("cei", "hud"), (guiGraphics, deltaTracker) -> {
+                // Prechauffage : 2 ms par frame, uniquement quand aucun ecran
+                // n'est ouvert -- c'est-a-dire pendant que le joueur ne demande
+                // rien. Le HUD n'est pas dessine quand un ecran l'est.
+                com.ceketrum.cei.CeiWarmup.onClientFrame();
                 var client = Minecraft.getInstance();
                 if (client.screen == null) {
                     var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
@@ -73,12 +77,22 @@ public class CEINeoForge {
     public static class GameplayEvents {
         @SubscribeEvent
         public static void onPlayerLoggedIn(ClientPlayerNetworkEvent.LoggingIn event) {
+            // Le cache d'items et l'index de recettes sont partages : on les vide
+            // au changement de monde, ou le registre et les recettes peuvent differer.
+            com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
+            com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex.invalidate();
+            com.ceketrum.cei.CeiWarmup.reset();
             BrewingRecipeManager.getInstance().clearCache();
             LootTableSourceManager.getInstance().clearCache();
         }
-        
+
         @SubscribeEvent
         public static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
+            // Le cache d'items et l'index de recettes sont partages : on les vide
+            // au changement de monde, ou le registre et les recettes peuvent differer.
+            com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
+            com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex.invalidate();
+            com.ceketrum.cei.CeiWarmup.reset();
             BrewingRecipeManager.getInstance().clearCache();
             LootTableSourceManager.getInstance().clearCache();
         }

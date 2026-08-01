@@ -23,7 +23,7 @@ import java.util.*;
  */
 public class BrewingRecipeManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("cei-brewing");
-    
+
     private static BrewingRecipeManager instance;
     private final Map<Identifier, List<BrewingRecipe>> cache = new HashMap<>();
     private boolean isCacheBuilt = false;
@@ -63,7 +63,7 @@ public class BrewingRecipeManager {
      *     hasRecipe(potion, ingredient)  --  teste POTION_TYPE_PREDICATE sur le 1er argument
      *     craft(ingredient, potion)      --  lit PotionUtil.getPotion() sur le 2e
      */
-    private void ensureCacheBuilt() {
+    public synchronized void ensureCacheBuilt() {
         if (isCacheBuilt) {
             return;
         }
@@ -150,7 +150,7 @@ public class BrewingRecipeManager {
     public List<BrewingRecipe> getRecipesForInput(ItemStack input) {
         ensureCacheBuilt();
         List<BrewingRecipe> list = new ArrayList<>();
-        
+
         for (List<BrewingRecipe> recipes : cache.values()) {
             for (BrewingRecipe recipe : recipes) {
                 if (recipe.ingredient.isOf(input.getItem())) {

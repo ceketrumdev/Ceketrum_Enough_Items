@@ -24,12 +24,20 @@ public class CEIClient implements ClientModInitializer {
 		
 		// Register connection events to clear and re-initialize caches
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+			// La liste d'items, l'index de recettes et le prechauffage
+			// dependent du monde : on repart de zero a chaque connexion.
+			com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
+			com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex.invalidate();
+			com.ceketrum.cei.CeiWarmup.reset();
 			BrewingRecipeManager.getInstance().clearCache();
 			LootTableSourceManager.getInstance().clearCache();
 		});
 		
 		// Register HUD Render Callback for Pinned Recipe card
 		net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register((drawContext, tickCounter) -> {
+			// Prechauffage : 2 ms par frame, uniquement quand aucun ecran
+			// n'est ouvert -- c'est-a-dire pendant que le joueur ne demande rien.
+			com.ceketrum.cei.CeiWarmup.onClientFrame();
 			var client = net.minecraft.client.MinecraftClient.getInstance();
 			if (client.currentScreen == null) {
 				var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();

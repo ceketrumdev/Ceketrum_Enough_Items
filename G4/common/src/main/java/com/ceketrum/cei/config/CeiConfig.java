@@ -54,6 +54,12 @@ public class CeiConfig {
      * le rendu, notamment sur les recettes moddees qui sortent du format 3x3.
      */
     private boolean useNewRecipeRenderer = true;
+
+    /**
+     * Instrumentation de mesure. Desactivee par defaut : elle n'a d'interet que
+     * pendant le calibrage des optimisations de la 0.1.5.
+     */
+    private boolean diagnostics = false;
     
     private CeiConfig() {
         Path configDir = PlatformHelper.getConfigDirectory().resolve("cei");
@@ -114,6 +120,8 @@ public class CeiConfig {
 
             // Nouveau pipeline de recettes (chemin parallele, cf. CeiRecipeAdapter)
             if (json.has("useNewRecipeRenderer")) useNewRecipeRenderer = json.get("useNewRecipeRenderer").getAsBoolean();
+            if (json.has("diagnostics")) diagnostics = json.get("diagnostics").getAsBoolean();
+            com.ceketrum.cei.diag.CeiDiagnostics.ENABLED = diagnostics;
             
             LOGGER.info("Configuration chargée depuis {}", configFile);
         } catch (Exception e) {
@@ -153,6 +161,7 @@ public class CeiConfig {
             // Popup d'aide
             json.addProperty("showHelpPopup", showHelpPopup);
             json.addProperty("useNewRecipeRenderer", useNewRecipeRenderer);
+            json.addProperty("diagnostics", diagnostics);
             
             Files.writeString(configFile, json.toString());
             LOGGER.debug("Configuration sauvegardée dans {}", configFile);
@@ -214,6 +223,9 @@ public class CeiConfig {
     public void setHoverColor(int hoverColor) { this.hoverColor = hoverColor; }
     
     // Getters et setters pour les animations
+    public boolean isDiagnostics() { return diagnostics; }
+    public void setDiagnostics(boolean v) { this.diagnostics = v; com.ceketrum.cei.diag.CeiDiagnostics.ENABLED = v; }
+
     public boolean isUseNewRecipeRenderer() { return useNewRecipeRenderer; }
     public void setUseNewRecipeRenderer(boolean v) { this.useNewRecipeRenderer = v; }
 
