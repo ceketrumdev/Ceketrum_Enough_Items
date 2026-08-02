@@ -1,5 +1,6 @@
 package com.ceketrum.cei.gui.screen;
 
+import com.ceketrum.cei.i18n.CeiText;
 import com.ceketrum.cei.data.BrewingRecipeManager;
 import com.ceketrum.cei.data.ItemDescriptionManager;
 import com.ceketrum.cei.data.LootTableSourceManager;
@@ -103,6 +104,13 @@ public class CeiItemInfoScreen extends Screen {
 
     private final List<RecipeCategory> categories = new ArrayList<>();
     private RecipeCategory activeCategory;
+
+    /** Onglets de categorie affiches simultanement dans la colonne de gauche. */
+    private static final int MAX_VISIBLE_CATEGORIES = 6;
+    /** Hauteur des boutons de defilement. */
+    private static final int SCROLL_BTN_H = 12;
+    /** Index du premier onglet affiche. */
+    private int categoryScroll = 0;
     private int currentPage = 0;
 
     // Recipes database for target item (Output)
@@ -140,7 +148,7 @@ public class CeiItemInfoScreen extends Screen {
     private RenderedSlot hoveredSlot = null;
 
     public CeiItemInfoScreen(Screen parentScreen, ItemStack targetStack, boolean isUsage) {
-        super(Component.literal("CEI Item Info"));
+        super(Component.literal(CeiText.t("cei.screen.item_info")));
         this.parentScreen = parentScreen;
         this.targetStack = targetStack.copy();
         this.isUsage = isUsage;
@@ -297,6 +305,9 @@ public class CeiItemInfoScreen extends Screen {
 
     private void updateCategories() {
         categories.clear();
+        // La colonne change de contenu : on revient en haut, sinon on peut
+        // rester bloque sur une fenetre qui n'existe plus.
+        categoryScroll = 0;
         if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
             boolean useUsages = (activeMainTab == TabType.USAGES);
             var craftList = useUsages ? craftingUsages : craftingRecipes;
@@ -533,13 +544,103 @@ public class CeiItemInfoScreen extends Screen {
         }
     }
 
+
+    /**
+     * Index du premier onglet affiche, borne a la volee.
+     *
+     * Le bornage est fait ici et non au moment du clic : la liste des
+     * categories change quand on passe de "Fabrication" a "Utilisations", et
+     * elle peut raccourcir. Un decalage devenu trop grand afficherait une
+     * colonne vide sans aucun moyen d'en sortir.
+     */
+    private int firstVisibleCategory() {
+        int max = Math.max(0, categories.size() - MAX_VISIBLE_CATEGORIES);
+        if (categoryScroll > max) categoryScroll = max;
+        if (categoryScroll < 0) categoryScroll = 0;
+        return categoryScroll;
+    }
+
+    /** Index de fin (exclu) de la fenetre affichee. */
+    private int lastVisibleCategory() {
+        return Math.min(categories.size(), firstVisibleCategory() + MAX_VISIBLE_CATEGORIES);
+    }
+
+    /** Y a-t-il assez de categories pour qu'on ait besoin de defiler ? */
+    private boolean categoriesScrollable() {
+        return categories.size() > MAX_VISIBLE_CATEGORIES;
+    }
+
+    /**
+     * Ordonnee du premier onglet.
+     *
+     * Sans fleches, la colonne demarre a la meme hauteur que celle de droite.
+     * Avec fleches, elle descend juste ce qu'il faut pour que celle du haut
+     * tienne dans le cadre : la colonne complete mesure 180 pixels pour un
+     * panneau de 179, elle s'y loge exactement.
+     */
+    private int categoryTabsTop() {
+        return categoriesScrollable() ? containerY + SCROLL_BTN_H + 2 : containerY + 10;
+    }
+
+    private int categoryScrollUpY() {
+        return containerY;
+    }
+
+    /**
+     * Calee sur le bord inferieur du panneau, sauf si celui-ci est trop court
+     * pour les six onglets -- auquel cas elle se contente de passer dessous.
+     */
+    private int categoryScrollDownY() {
+        int belowTabs = categoryTabsTop() + (MAX_VISIBLE_CATEGORIES - 1) * 26 + 24;
+        return Math.max(belowTabs, containerY + containerHeight - SCROLL_BTN_H);
+    }
+
+    private boolean categoryScrollHit(double mouseX, double mouseY, int y) {
+        int x = containerX - 24;
+        return mouseX >= x && mouseX < x + 27 && mouseY >= y && mouseY < y + SCROLL_BTN_H;
+    }
+
+    /** Fleches de defilement de la colonne d'onglets. */
+    private void drawCategoryScrollArrows(GuiGraphics context, int mouseX, int mouseY) {
+        if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
+        if (!categoriesScrollable()) return;
+
+        if (firstVisibleCategory() > 0) {
+            drawScrollButton(context, categoryScrollUpY(), true, mouseX, mouseY);
+        }
+        if (lastVisibleCategory() < categories.size()) {
+            drawScrollButton(context, categoryScrollDownY(), false, mouseX, mouseY);
+        }
+    }
+
+    private void drawScrollButton(GuiGraphics context, int y, boolean up, int mouseX, int mouseY) {
+        int x = containerX - 24;
+        boolean hovered = mouseX >= x && mouseX < x + 27 && mouseY >= y && mouseY < y + SCROLL_BTN_H;
+
+        GuiRenderHelper.drawRoundedBackground(context, x, y, 27, SCROLL_BTN_H, 4,
+                hovered ? 0xAA2D2D2D : 0xD9141414);
+        context.renderOutline(x, y, 27, SCROLL_BTN_H, hovered ? 0x66FFFFFF : 0x22FFFFFF);
+
+        // Triangle dessine au pixel : la police ne garantit pas les caracteres
+        // de fleche dans toutes les langues, et un pack de ressources peut les
+        // remplacer par n'importe quoi.
+        int cx = x + 13;
+        int top = y + 4;
+        int tint = 0xFFFFFFFF;
+        for (int r = 0; r < 4; r++) {
+            int w = up ? (r * 2 + 1) : ((3 - r) * 2 + 1);
+            context.fill(cx - w / 2, top + r, cx + w / 2 + 1, top + r + 1, tint);
+        }
+    }
+
     private void drawCategoryTabsBackground(GuiGraphics context, int mouseX, int mouseY) {
         if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
 
-        for (int i = 0; i < categories.size(); i++) {
+        int first = firstVisibleCategory();
+        for (int i = first; i < lastVisibleCategory(); i++) {
             RecipeCategory cat = categories.get(i);
             int tabX = containerX - 24;
-            int tabY = containerY + 10 + i * 26;
+            int tabY = categoryTabsTop() + (i - first) * 26;
 
             boolean active = (cat.equals(activeCategory));
             boolean hovered = mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22;
@@ -548,15 +649,18 @@ public class CeiItemInfoScreen extends Screen {
             GuiRenderHelper.drawRoundedBackground(context, tabX, tabY, 27, 22, 6, tabBg);
             context.renderOutline(tabX, tabY, 27, 22, active ? 0x66FFFFFF : 0x22FFFFFF);
         }
+
+        drawCategoryScrollArrows(context, mouseX, mouseY);
     }
 
     private void drawCategoryTabsIcons(GuiGraphics context) {
         if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
 
-        for (int i = 0; i < categories.size(); i++) {
+        int first = firstVisibleCategory();
+        for (int i = first; i < lastVisibleCategory(); i++) {
             RecipeCategory cat = categories.get(i);
             int tabX = containerX - 24;
-            int tabY = containerY + 10 + i * 26;
+            int tabY = categoryTabsTop() + (i - first) * 26;
 
             ItemStack iconStack = switch (cat.type) {
                 case CRAFTING -> new ItemStack(Items.CRAFTING_TABLE);
@@ -602,7 +706,7 @@ public class CeiItemInfoScreen extends Screen {
             case DESCRIPTION: {
                 String desc = ItemDescriptionManager.getInstance().getDescription(targetStack.getItem());
                 if (desc.isEmpty()) {
-                    desc = isFr ? "Aucune description disponible pour cet item." : "No description available for this item.";
+                    desc = CeiText.t("cei.info.no_description");
                 }
 
                 // Real stats integration in description tab
@@ -616,7 +720,7 @@ public class CeiItemInfoScreen extends Screen {
                     context.fill(contentX, currY, contentX + contentWidth, currY + 1, 0x22FFFFFF);
                     currY += 6;
 
-                    String statsTitle = isFr ? "Statistiques :" : "Statistics:";
+                    String statsTitle = CeiText.t("cei.info.statistics");
                     context.drawString(this.font, statsTitle, contentX, currY, 0xFFD700, false);
                     currY += 11;
 
@@ -624,28 +728,28 @@ public class CeiItemInfoScreen extends Screen {
                     float scale = 0.75f;
 
                     if (stats.hasAttackDamage) {
-                        String val = String.format("%s: +%.1f", isFr ? "Dégâts" : "Damage", stats.attackDamage);
+                        String val = String.format("%s: +%.1f", CeiText.t("cei.stat.damage"), stats.attackDamage);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
                     }
                     if (stats.hasAttackSpeed) {
                         double speed = 4.0 + stats.attackSpeed;
-                        String val = String.format("%s: %.1f", isFr ? "Vitesse d'attaque" : "Attack Speed", speed);
+                        String val = String.format("%s: %.1f", CeiText.t("cei.stat.attack_speed"), speed);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
                     }
                     if (stats.hasArmor) {
-                        String val = String.format("%s: +%.0f", isFr ? "Armure" : "Armor", stats.armor);
+                        String val = String.format("%s: +%.0f", CeiText.t("cei.stat.armor"), stats.armor);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
                     }
                     if (stats.hasToughness) {
-                        String val = String.format("%s: +%.0f", isFr ? "Robustesse" : "Toughness", stats.toughness);
+                        String val = String.format("%s: +%.0f", CeiText.t("cei.stat.toughness"), stats.toughness);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
                     }
                     if (stats.hasFood) {
-                        String val = String.format("%s: +%d (Saturation: +%.1f)", isFr ? "Nourriture" : "Food", stats.foodPoints, stats.saturation);
+                        String val = String.format("%s: +%d (Saturation: +%.1f)", CeiText.t("cei.stat.food"), stats.foodPoints, stats.saturation);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
                     }
                     if (stats.hasDurability) {
-                        String val = String.format("%s: %d / %d", isFr ? "Durabilité" : "Durability", stats.durability, stats.maxDurability);
+                        String val = String.format("%s: %d / %d", CeiText.t("cei.stat.durability"), stats.durability, stats.maxDurability);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
                     }
                 }
@@ -654,8 +758,8 @@ public class CeiItemInfoScreen extends Screen {
             case CRAFTING:
             case USAGES: {
                 if (activeCategory == null || getActiveRecipesList().isEmpty()) {
-                    String emptyMsg = isFr ? (activeMainTab == TabType.CRAFTING ? "Aucune recette de craft." : "Aucun usage de craft.")
-                                           : (activeMainTab == TabType.CRAFTING ? "No recipes found." : "No usages found.");
+                    String emptyMsg = CeiText.t(activeMainTab == TabType.CRAFTING
+                            ? "cei.info.no_recipes" : "cei.info.no_usages");
                     int msgW = this.font.width(emptyMsg);
                     context.drawString(this.font, emptyMsg, contentX + (contentWidth - msgW) / 2, contentY + 40, 0xFFFF0000, false);
                 } else {
@@ -665,7 +769,7 @@ public class CeiItemInfoScreen extends Screen {
             }
             case LOOT: {
                 List<String> lootSources = LootTableSourceManager.getInstance().getSourcesForItem(targetStack.getItem());
-                String header = isFr ? "Sources d'Obtention :" : "Obtaining Sources:";
+                String header = CeiText.t("cei.info.obtaining_sources");
                 context.drawString(this.font, header, contentX, contentY, 0xFFD700, false);
                 int currY = contentY + 14;
 
@@ -683,20 +787,23 @@ public class CeiItemInfoScreen extends Screen {
 
                 // Remove duplicates and placeholders
                 Set<String> uniqueLocs = new LinkedHashSet<>();
-                String placeholderFr = "Partout dans le monde / Non spécifié";
-                String placeholderEn = "Everywhere / Not specified";
+                // Un seul libelle de repli, partage avec LootTableSourceManager.
+                // Avant, deux chaines codees en dur servaient a la fois de valeur
+                // et de filtre : il suffisait qu'une des deux bouge pour que le
+                // doublon reapparaisse a l'ecran.
+                String placeholder = CeiText.t("cei.loot.where.unspecified");
 
                 for (String loc : locations) {
-                    if (!loc.equals(placeholderFr) && !loc.equals(placeholderEn)) {
+                    if (!loc.equals(placeholder)) {
                         uniqueLocs.add(loc);
                     }
                 }
 
                 if (uniqueLocs.isEmpty()) {
-                    uniqueLocs.add(isFr ? placeholderFr : placeholderEn);
+                    uniqueLocs.add(placeholder);
                 }
 
-                String header = isFr ? "Biomes et Structures :" : "Biomes and Structures:";
+                String header = CeiText.t("cei.info.biomes_structures");
                 context.drawString(this.font, header, contentX, contentY, 0xFFD700, false);
                 int currY = contentY + 14;
 
@@ -733,11 +840,11 @@ public class CeiItemInfoScreen extends Screen {
         };
 
         String catName = switch (activeCategory.type) {
-            case CRAFTING -> isFr ? "Table de Craft" : "Crafting Table";
-            case SMELTING -> isFr ? "Fourneau" : "Furnace";
-            case BREWING -> isFr ? "Alambic" : "Brewing Stand";
-            case STONECUTTING -> isFr ? "Tailleur de Pierre" : "Stonecutter";
-            case SMITHING -> isFr ? "Table de Forgeron" : "Smithing Table";
+            case CRAFTING -> CeiText.t("cei.station.crafting_table");
+            case SMELTING -> CeiText.t("cei.station.furnace");
+            case BREWING -> CeiText.t("cei.station.brewing_stand");
+            case STONECUTTING -> CeiText.t("cei.station.stonecutter");
+            case SMITHING -> CeiText.t("cei.station.smithing_table");
             case CUSTOM -> {
                 // Le libelle vient desormais du type de recette lui-meme :
                 // create:crushing doit s'afficher "Crushing Wheel", pas
@@ -745,7 +852,7 @@ public class CeiItemInfoScreen extends Screen {
                 if (finalRecipe != null) {
                     yield getMachineLabel(finalRecipe, isFr);
                 }
-                yield isFr ? "Machine Spéciale" : "Custom Machine";
+                yield CeiText.t("cei.station.custom");
             }
         };
 
@@ -1091,8 +1198,8 @@ public class CeiItemInfoScreen extends Screen {
         int pinY = containerY + 5;
         if (mouseX >= pinX && mouseX < pinX + 12 && mouseY >= pinY && mouseY < pinY + 12) {
             String tooltipText = isPinned
-                ? (isFr ? "Désancrer la recette" : "Unpin recipe")
-                : (isFr ? "Ancrer la recette" : "Pin recipe");
+                ? (CeiText.t("cei.pin.unpin"))
+                : (CeiText.t("cei.pin.pin"));
             context.renderComponentTooltip(this.font, List.of(Component.literal(tooltipText)), mouseX, mouseY);
             return;
         }
@@ -1102,8 +1209,8 @@ public class CeiItemInfoScreen extends Screen {
             int hudY = containerY + 5;
             if (mouseX >= hudX && mouseX < hudX + 12 && mouseY >= hudY && mouseY < hudY + 12) {
                 String tooltipText = card.isShowInHud()
-                    ? (isFr ? "Masquer sur l'écran de jeu" : "Hide on HUD")
-                    : (isFr ? "Afficher sur l'écran de jeu" : "Show on HUD");
+                    ? (CeiText.t("cei.pin.hud_hide"))
+                    : (CeiText.t("cei.pin.hud_show"));
                 context.renderComponentTooltip(this.font, List.of(Component.literal(tooltipText)), mouseX, mouseY);
                 return;
             }
@@ -1112,7 +1219,7 @@ public class CeiItemInfoScreen extends Screen {
             int opY = containerY + 5;
             if (mouseX >= opX && mouseX < opX + 12 && mouseY >= opY && mouseY < opY + 12) {
                 String tooltipText = String.format("%s : %d%%",
-                    isFr ? "Opacité" : "Opacity",
+                    CeiText.t("cei.pin.opacity"),
                     (int) (card.getOpacity() * 100)
                 );
                 context.renderComponentTooltip(this.font, List.of(Component.literal(tooltipText)), mouseX, mouseY);
@@ -1128,11 +1235,11 @@ public class CeiItemInfoScreen extends Screen {
 
             if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
                 String tooltipText = switch (tab) {
-                    case DESCRIPTION -> isFr ? "Description & Stats" : "Description & Stats";
-                    case CRAFTING -> isFr ? "Comment Crafter" : "How to Craft";
-                    case USAGES -> isFr ? "Usages (Ingrédient)" : "Usages (Ingredient)";
-                    case LOOT -> isFr ? "Comment l'obtenir (Loot)" : "Obtaining (Loot)";
-                    case WORLD -> isFr ? "Biomes et Structures" : "Biomes and Structures";
+                    case DESCRIPTION -> CeiText.t("cei.tab.description");
+                    case CRAFTING -> CeiText.t("cei.tab.craft");
+                    case USAGES -> CeiText.t("cei.tab.usages");
+                    case LOOT -> CeiText.t("cei.tab.loot");
+                    case WORLD -> CeiText.t("cei.tab.biomes");
                 };
                 context.renderComponentTooltip(this.font, List.of(Component.literal(tooltipText)), mouseX, mouseY);
                 return;
@@ -1141,18 +1248,19 @@ public class CeiItemInfoScreen extends Screen {
 
         // 2. Tooltips for category tabs
         if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
-            for (int i = 0; i < categories.size(); i++) {
+            int first = firstVisibleCategory();
+            for (int i = first; i < lastVisibleCategory(); i++) {
                 RecipeCategory cat = categories.get(i);
                 int tabX = containerX - 24;
-                int tabY = containerY + 10 + i * 26;
+                int tabY = categoryTabsTop() + (i - first) * 26;
 
                 if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
                     String tooltipText = switch (cat.type) {
-                        case CRAFTING -> isFr ? "Table de Craft" : "Crafting Table";
-                        case SMELTING -> isFr ? "Cuisson & Fourneau" : "Smelting & Furnace";
-                        case BREWING -> isFr ? "Alambic (Potions)" : "Brewing Stand";
-                        case STONECUTTING -> isFr ? "Tailleur de Pierre" : "Stonecutter";
-                        case SMITHING -> isFr ? "Table de Forgeron (Smithing)" : "Smithing Table";
+                        case CRAFTING -> CeiText.t("cei.station.crafting_table");
+                        case SMELTING -> CeiText.t("cei.cat.smelting");
+                        case BREWING -> CeiText.t("cei.cat.brewing");
+                        case STONECUTTING -> CeiText.t("cei.station.stonecutter");
+                        case SMITHING -> CeiText.t("cei.station.smithing_table");
                         case CUSTOM -> {
                             boolean useUsages = (activeMainTab == TabType.USAGES);
                             List<?> list = useUsages ? customUsages : customRecipes;
@@ -1170,7 +1278,7 @@ public class CeiItemInfoScreen extends Screen {
                             if (matchedRecipe != null) {
                                 yield getMachineLabel(matchedRecipe, isFr);
                             }
-                            yield isFr ? "Machine Spéciale (Mod)" : "Special Machine (Mod)";
+                            yield CeiText.t("cei.cat.custom");
                         }
                     };
                     context.renderComponentTooltip(this.font, List.of(Component.literal(tooltipText)), mouseX, mouseY);
@@ -1198,8 +1306,8 @@ public class CeiItemInfoScreen extends Screen {
             int plusY = arrowY + 12;
 
             if (mouseX >= plusX && mouseX < plusX + 12 && mouseY >= plusY && mouseY < plusY + 12) {
-                String title = isFr ? "Remplir la Table de Craft (+)" : "Fill Crafting Table (+)";
-                String hint = isFr ? "Shift + Clic : Remplir au maximum" : "Shift + Click: Fill maximum";
+                String title = CeiText.t("cei.craft.fill");
+                String hint = CeiText.t("cei.craft.fill_hint");
                 context.renderComponentTooltip(this.font, List.of(
                     Component.literal(title).withStyle(ChatFormatting.GREEN),
                     Component.literal(hint).withStyle(ChatFormatting.GRAY)
@@ -1341,12 +1449,32 @@ public class CeiItemInfoScreen extends Screen {
             }
         }
 
+        // 2 bis. Fleches de defilement de la colonne d'onglets.
+        //         Testees AVANT les onglets : elles se trouvent juste au-dessus
+        //         et juste en dessous de la colonne, et un clic doit revenir a
+        //         la fleche, pas au premier onglet.
+        if ((activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES)
+                && categoriesScrollable()) {
+            if (firstVisibleCategory() > 0 && categoryScrollHit(mouseX, mouseY, categoryScrollUpY())) {
+                categoryScroll--;
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+            if (lastVisibleCategory() < categories.size()
+                    && categoryScrollHit(mouseX, mouseY, categoryScrollDownY())) {
+                categoryScroll++;
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+        }
+
         // 2. Check category tabs clicks
         if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
-            for (int i = 0; i < categories.size(); i++) {
+            int first = firstVisibleCategory();
+            for (int i = first; i < lastVisibleCategory(); i++) {
                 RecipeCategory cat = categories.get(i);
                 int tabX = containerX - 24;
-                int tabY = containerY + 10 + i * 26;
+                int tabY = categoryTabsTop() + (i - first) * 26;
 
                 if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
                     activeCategory = cat;
@@ -1727,12 +1855,19 @@ public class CeiItemInfoScreen extends Screen {
         return cleanList;
     }
 
-    private static void unpackInputObject(Object obj, List<ItemStack> list) {
-        unpackInputObject(obj, list, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+    public static void unpackInputObject(Object obj, List<ItemStack> list) {
+        unpackInputObject(obj, list, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()), 0);
     }
 
-    private static void unpackInputObject(Object obj, List<ItemStack> list, Set<Object> visited) {
-        if (obj == null || !visited.add(obj)) return;
+    /**
+     * @param depth profondeur restante. Indispensable : cette methode invoque
+     *              des accesseurs, et un accesseur qui construit son resultat
+     *              renvoie un objet neuf a chaque appel -- l'ensemble
+     *              anti-cycle, qui raisonne par identite, ne le reconnait
+     *              jamais et la descente ne s'arrete pas d'elle-meme.
+     */
+    private static void unpackInputObject(Object obj, List<ItemStack> list, Set<Object> visited, int depth) {
+        if (obj == null || depth > 8 || !visited.add(obj)) return;
 
         if (obj instanceof net.minecraft.world.item.crafting.Ingredient ing) {
             for (ItemStack match : ing.getItems()) {
@@ -1762,7 +1897,7 @@ public class CeiItemInfoScreen extends Screen {
 
         if (obj instanceof Collection<?> col) {
             for (Object el : col) {
-                unpackInputObject(el, list, visited);
+                unpackInputObject(el, list, visited, depth + 1);
             }
             return;
         }
@@ -1770,14 +1905,14 @@ public class CeiItemInfoScreen extends Screen {
         if (obj.getClass().isArray()) {
             int length = java.lang.reflect.Array.getLength(obj);
             for (int i = 0; i < length; i++) {
-                unpackInputObject(java.lang.reflect.Array.get(obj, i), list, visited);
+                unpackInputObject(java.lang.reflect.Array.get(obj, i), list, visited, depth + 1);
             }
             return;
         }
 
         if (obj instanceof java.util.Optional<?> opt) {
             if (opt.isPresent()) {
-                unpackInputObject(opt.get(), list, visited);
+                unpackInputObject(opt.get(), list, visited, depth + 1);
             }
             return;
         }
@@ -1800,7 +1935,7 @@ public class CeiItemInfoScreen extends Screen {
                     f.setAccessible(true);
                     Object val = f.get(obj);
                     if (val != null) {
-                        unpackInputObject(val, list, visited);
+                        unpackInputObject(val, list, visited, depth + 1);
                     }
                 } catch (Exception e) {}
             }
@@ -1819,7 +1954,7 @@ public class CeiItemInfoScreen extends Screen {
                         m.setAccessible(true);
                         Object val = m.invoke(obj);
                         if (val != null) {
-                            unpackInputObject(val, list, visited);
+                            unpackInputObject(val, list, visited, depth + 1);
                         }
                     } catch (Exception e) {}
                 }
@@ -1837,7 +1972,7 @@ public class CeiItemInfoScreen extends Screen {
      * recette (create:crushing -> "Crushing Wheel", a defaut "Crushing").
      */
     private String getMachineLabel(Recipe<?> recipe, boolean isFr) {
-        if (recipe == null) return isFr ? "Machine Spéciale" : "Custom Machine";
+        if (recipe == null) return CeiText.t("cei.station.custom");
         ItemStack icon = getMachineIcon(recipe);
         if (icon != null && !icon.isEmpty() && icon.getItem() != Items.DISPENSER) {
             String name = icon.getHoverName().getString();

@@ -166,7 +166,7 @@ public final class CeiRecipeIndex {
                     .extractCustomOutputs(recipe, contextMap)) {
                 if (out != null && !out.isEmpty()) produced.add(out.getItem());
             }
-        } catch (Exception | LinkageError e) {
+        } catch (Exception | StackOverflowError | LinkageError e) {
             // une recette moddee peut lever : elle est simplement absente de
             // l'index cote sorties, comme elle l'etait de l'ancien balayage
         }
@@ -181,7 +181,7 @@ public final class CeiRecipeIndex {
                     }
                 }
             }
-        } catch (Exception | LinkageError e) {
+        } catch (Exception | StackOverflowError | LinkageError e) {
             // idem
         }
         try {
@@ -189,7 +189,7 @@ public final class CeiRecipeIndex {
                     .extractCustomInputs(recipe, contextMap)) {
                 if (in != null && !in.isEmpty()) consumed.add(in.getItem());
             }
-        } catch (Exception | LinkageError e) {
+        } catch (Exception | StackOverflowError | LinkageError e) {
             // idem
         }
 

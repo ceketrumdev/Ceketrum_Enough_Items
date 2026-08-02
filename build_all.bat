@@ -53,8 +53,10 @@ for %%G in (G1 G2 G3 G4 G5 G6 G7) do (
 )
 
 echo.
-echo Termine. Jars disponibles :
-dir /B dist
+echo Termine. Jars disponibles (date = moment ou Gradle a produit le jar,
+echo pas celui de la copie : copy conserve la date d'origine).
+echo.
+for %%F in (dist\*.jar) do @echo   %%~tF  %%~zF octets  %%~nxF
 goto :eof
 
 :fail

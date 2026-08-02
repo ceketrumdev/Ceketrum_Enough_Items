@@ -1,5 +1,6 @@
 package com.ceketrum.cei.data;
 
+import com.ceketrum.cei.i18n.CeiText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -719,7 +720,7 @@ public class LootTableSourceManager {
 
         // If still empty, return Everywhere / Not specified
         if (locations.isEmpty()) {
-            locations.add(isFrench ? "Partout dans le monde / Non spécifié" : "Everywhere / Not specified");
+            locations.add(CeiText.t("cei.loot.where.unspecified"));
         }
 
         List<String> result = new ArrayList<>(locations);

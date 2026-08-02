@@ -80,7 +80,7 @@ public final class CeiWarmup {
                         CeiItemInfoScreen::extractCustomOutputs,
                         CeiItemInfoScreen::extractCustomInputs,
                         BUDGET_NANOS);
-            } catch (Exception | LinkageError e) {
+            } catch (Exception | StackOverflowError | LinkageError e) {
                 // Un echec de prechauffage ne doit jamais empecher de jouer :
                 // le chemin paresseux reste disponible a l'ouverture d'une fiche.
                 recipesReady = true;
@@ -97,12 +97,12 @@ public final class CeiWarmup {
         long t0 = CeiDiagnostics.begin();
         try {
             LootTableSourceManager.getInstance().ensureCacheBuilt();
-        } catch (Exception | LinkageError e) {
+        } catch (Exception | StackOverflowError | LinkageError e) {
             // deja journalise par le gestionnaire concerne
         }
         try {
             BrewingRecipeManager.getInstance().ensureCacheBuilt();
-        } catch (Exception | LinkageError e) {
+        } catch (Exception | StackOverflowError | LinkageError e) {
             // idem
         }
         CeiDiagnostics.end("Prechauffage des tables et potions", t0);

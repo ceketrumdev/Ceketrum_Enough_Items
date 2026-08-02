@@ -1,0 +1,26 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="ECLIPTEA-1.0"
+
+[[mods]]
+modId="cei"
+version="${version}"
+displayName="CEI"
+authors="Ceketrum"
+description='''
+Ceketrum Enhanced Inventory - Advanced item browsing and recipe viewing system.
+'''
+
+[[dependencies.cei]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.cei]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1]"
+ordering="NONE"
+side="BOTH"

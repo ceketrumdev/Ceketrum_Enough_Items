@@ -1,0 +1,31 @@
+// Build AUTONOME du laboratoire G1-DEV.
+//
+// Volontairement absent du settings.gradle racine : le labo ne doit rien
+// pouvoir casser dans la chaine de build de production. Il se construit avec
+// le wrapper de la racine, en pointant le projet ici :
+//
+//     gradlew.bat -p G1-DEV build
+//
+pluginManagement {
+    repositories {
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        maven {
+            name = 'NeoForged'
+            url = 'https://maven.neoforged.net/releases/'
+        }
+        maven {
+            name = 'Architectury'
+            url = 'https://maven.architectury.dev/'
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'cei-G1DEV'
+
+include 'fabric'
+include 'neoforge'

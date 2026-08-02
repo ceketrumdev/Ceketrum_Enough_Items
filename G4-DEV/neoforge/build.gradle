@@ -1,0 +1,74 @@
+plugins {
+    id 'dev.architectury.loom'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = "${project.archives_base_name}-G4DEV-neoforge"
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven { url = "https://maven.neoforged.net/releases/" }
+    maven { url = "https://maven.architectury.dev/" }
+}
+
+loom {
+    silentMojangMappingsLicense()
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ["src/main/java", "../common/src/main/java"]
+        }
+        resources {
+            srcDirs = ["src/main/resources", "../common/src/main/resources"]
+        }
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    
+    neoForge "net.neoforged:neoforge:${project.neoforge_version}"
+
+    // API JEI VERBATIM, extraite telle quelle de
+    // jei-1.21.1-neoforge-19.27.0.340.jar (licence MIT, avis conserve dans le
+    // jar). Aucune reecriture : c'est ce qui garantit que les plugins deja
+    // compiles contre le vrai JEI se lient a nos classes sans NoSuchMethodError.
+    //
+    // compileOnly : ces classes sont deja dans l'espace de noms de production
+    // (ce module compile en officialMojangMappings, comme NeoForge), donc on
+    // les embarque telles quelles ci-dessous plutot que de les laisser remapper.
+    compileOnly files("${rootDir}/libs/jei-api-19.27.0.340.jar")
+}
+
+// Embarquement verbatim de l'API dans le jar final.
+jar {
+    from(zipTree(file("${rootDir}/libs/jei-api-19.27.0.340.jar")))
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+processResources {
+    inputs.property "version", project.version
+
+    filesMatching(["META-INF/mods.toml", "META-INF/neoforge.mods.toml"]) {
+        expand "version": inputs.properties.version
+    }
+}

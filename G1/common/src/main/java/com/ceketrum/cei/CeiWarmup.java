@@ -75,7 +75,7 @@ public final class CeiWarmup {
             buildFrames++;
             try {
                 recipesReady = CeiRecipeIndex.buildStep(client, BUDGET_NANOS);
-            } catch (Exception | LinkageError e) {
+            } catch (Exception | StackOverflowError | LinkageError e) {
                 // Un echec de prechauffage ne doit jamais empecher de jouer :
                 // le chemin paresseux reste disponible a l'ouverture d'une fiche.
                 LOGGER.warn("[WARMUP] Prechauffage de l'index abandonne : {}", e.toString());
@@ -92,12 +92,12 @@ public final class CeiWarmup {
         // Le reste est court et ne se decoupe pas naturellement : une frame suffit.
         try {
             LootTableSourceManager.getInstance().ensureCacheBuilt();
-        } catch (Exception | LinkageError e) {
+        } catch (Exception | StackOverflowError | LinkageError e) {
             // deja journalise par le gestionnaire concerne
         }
         try {
             BrewingRecipeManager.getInstance().ensureCacheBuilt();
-        } catch (Exception | LinkageError e) {
+        } catch (Exception | StackOverflowError | LinkageError e) {
             // idem
         }
         done = true;

@@ -1,0 +1,53 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="ECLIPTEA-1.0"
+
+[[mods]]
+modId="cei"
+version="${version}"
+displayName="CEI"
+authors="Ceketrum"
+description='''
+Ceketrum Enhanced Inventory - Advanced item browsing and recipe viewing system. Compatible with NeoForge.
+'''
+
+[[dependencies.cei]]
+modId="neoforge"
+mandatory=true
+versionRange="[21.1,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.cei]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.21,1.21.5)"
+ordering="NONE"
+side="BOTH"
+
+# ---------------------------------------------------------------------------
+# LABO G4-DEV : declaration de l'identifiant de mod 'jei'.
+#
+# Fait croire au chargeur que JEI est present, ce qui debloque les addons qui
+# le declarent en dependance obligatoire. INDISSOCIABLE de l'API embarquee
+# dans ce meme jar : sans elle, les addons se chargeraient puis planteraient
+# au premier acces a une classe mezz.jei.api.*.
+#
+# INCOMPATIBLE avec le vrai JEI (meme identifiant) : retirer jei-*.jar du pack.
+#
+# Version : 19.99.0.999 satisfait toutes les bornes ouvertes rencontrees
+# ([19.21.0.247,), [19,), [0,)) sans franchir une eventuelle borne haute en 20.
+# ---------------------------------------------------------------------------
+[[mods]]
+modId="jei"
+version="19.99.0.999"
+displayName="JEI API (fournie par CEI - LABO)"
+authors="mezz (API, licence MIT) - pont CEI par Ceketrum"
+description='''
+Fournit l API publique de Just Enough Items et l identifiant de mod
+correspondant. Ne fournit PAS JEI : l interface est celle de CEI.
+'''
+
+[[mixins]]
+config = "cei.client.mixins.json"
+

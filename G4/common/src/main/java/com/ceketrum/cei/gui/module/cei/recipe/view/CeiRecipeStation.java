@@ -1,5 +1,6 @@
 package com.ceketrum.cei.gui.module.cei.recipe.view;
 
+import com.ceketrum.cei.i18n.CeiText;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -65,7 +66,7 @@ public final class CeiRecipeStation {
 
     /** Libelle de la categorie. Ne renvoie jamais null ni chaine vide. */
     public static synchronized String labelFor(ResourceLocation typeId, boolean isFr) {
-        if (typeId == null) return isFr ? "Machine Speciale" : "Custom Machine";
+        if (typeId == null) return CeiText.t("cei.station.custom");
         String cached = LABELS.get(typeId);
         if (cached != null) return cached;
         String label = resolveLabel(typeId, isFr);

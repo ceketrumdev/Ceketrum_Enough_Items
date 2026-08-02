@@ -1,0 +1,22 @@
+// Racine du build AUTONOME du laboratoire G4-DEV (MC 1.21.1).
+//
+// Volontairement absent du settings.gradle racine : le labo ne doit pas
+// pouvoir casser la chaine de production. Construction :
+//
+//     gradlew.bat -p G4-DEV :neoforge:build
+//
+// La version du plugin Loom est declaree ici : en build racine, G4 l'heritait
+// du build.gradle de la racine du depot.
+plugins {
+    id 'dev.architectury.loom' version '1.14.476' apply false
+    id 'idea'
+    id 'eclipse'
+}
+
+allprojects {
+    apply plugin: 'idea'
+    apply plugin: 'eclipse'
+
+    group = 'com.ceketrum'
+    version = '0.1.4-DEV'
+}

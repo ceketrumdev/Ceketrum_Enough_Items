@@ -1,5 +1,6 @@
 package com.ceketrum.cei.gui.module.cei.components;
 
+import com.ceketrum.cei.i18n.CeiText;
 import com.ceketrum.cei.data.ItemDescriptionManager;
 import com.ceketrum.cei.gui.constants.GuiConstants;
 import com.ceketrum.cei.gui.module.cei.util.AnimationHelper;
@@ -21,8 +22,8 @@ import net.minecraft.world.item.ItemStack;
  */
 public class RecipePopupRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger("cei-recipe-popup");
-    private final Map<ResourceLocation, Long> popupOpenTimes = new HashMap<>(); 
-    private final Map<ResourceLocation, Boolean> animationCompleted = new HashMap<>(); 
+    private final Map<ResourceLocation, Long> popupOpenTimes = new HashMap<>();
+    private final Map<ResourceLocation, Boolean> animationCompleted = new HashMap<>();
     private int currentPopupX = 0;
     private int currentPopupY = 0;
     private static final int POPUP_ANIMATION_DURATION = 180; // ms
@@ -31,34 +32,34 @@ public class RecipePopupRenderer {
         public int durability = -1;
         public int maxDurability = -1;
         public boolean hasDurability = false;
-        
+
         public int foodPoints = -1;
         public float saturation = -1;
         public boolean hasFood = false;
-        
+
         public double attackDamage = 0;
         public boolean hasAttackDamage = false;
-        
+
         public double attackSpeed = 0;
         public boolean hasAttackSpeed = false;
-        
+
         public double armor = 0;
         public boolean hasArmor = false;
-        
+
         public double toughness = 0;
         public boolean hasToughness = false;
     }
 
     public ItemStats getItemStats(ItemStack stack) {
         ItemStats stats = new ItemStats();
-        
+
         // Durability
         if (stack.isDamageableItem()) {
             stats.hasDurability = true;
             stats.maxDurability = stack.getMaxDamage();
             stats.durability = stats.maxDurability - stack.getDamageValue();
         }
-        
+
         // Food
         net.minecraft.world.food.FoodProperties food = stack.get(net.minecraft.core.component.DataComponents.FOOD);
         if (food != null) {
@@ -66,14 +67,14 @@ public class RecipePopupRenderer {
             stats.foodPoints = food.nutrition();
             stats.saturation = food.saturation();
         }
-        
+
         // Attributes
         net.minecraft.world.item.component.ItemAttributeModifiers attributeComponent = stack.get(net.minecraft.core.component.DataComponents.ATTRIBUTE_MODIFIERS);
         if (attributeComponent != null) {
             for (net.minecraft.world.item.component.ItemAttributeModifiers.Entry entry : attributeComponent.modifiers()) {
                 double amount = entry.modifier().amount();
                 var attribute = entry.attribute();
-                
+
                 if (attribute.equals(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE)) {
                     stats.hasAttackDamage = true;
                     stats.attackDamage = amount;
@@ -89,25 +90,25 @@ public class RecipePopupRenderer {
                 }
             }
         }
-        
+
         return stats;
     }
-    
+
     private int calculateWrappedTextLines(String text, int maxWidth, float scale, net.minecraft.client.gui.Font textRenderer) {
         if (text == null || text.isEmpty()) return 0;
-        
+
         String normalized = text.replace("\\n", "\n").replace("\r\n", "\n").replace("\r", "\n");
         String[] paragraphs = normalized.split("\n");
         int linesCount = 0;
-        
+
         for (String paragraph : paragraphs) {
             String[] words = paragraph.split(" ");
             StringBuilder currentLine = new StringBuilder();
-            
+
             for (String word : words) {
                 String testLine = currentLine.length() > 0 ? currentLine + " " + word : word;
                 int testWidth = (int) (textRenderer.width(testLine) * scale);
-                
+
                 if (testWidth > maxWidth && currentLine.length() > 0) {
                     linesCount++;
                     currentLine = new StringBuilder(word);
@@ -118,18 +119,18 @@ public class RecipePopupRenderer {
                     currentLine.append(word);
                 }
             }
-            
+
             if (currentLine.length() > 0) {
                 linesCount++;
             }
         }
-        
+
         return linesCount;
     }
-    
+
     private int calculatePopupHeight(String itemDescription, ItemStats stats, net.minecraft.client.gui.Font textRenderer) {
         int height = 25; // Header (Item name + space)
-        
+
         // Description
         if (!itemDescription.isEmpty()) {
             height += 8; // Margin
@@ -138,7 +139,7 @@ public class RecipePopupRenderer {
             int lines = calculateWrappedTextLines(itemDescription, descMaxWidth, scale, textRenderer);
             height += lines * ((int)(textRenderer.lineHeight * scale) + 2);
         }
-        
+
         // Stats
         boolean hasAnyStats = stats.hasDurability || stats.hasFood || stats.hasAttackDamage || stats.hasAttackSpeed || stats.hasArmor || stats.hasToughness;
         if (hasAnyStats) {
@@ -150,11 +151,11 @@ public class RecipePopupRenderer {
             if (stats.hasAttackSpeed) statLinesCount++;
             if (stats.hasArmor) statLinesCount++;
             if (stats.hasToughness) statLinesCount++;
-            
+
             float scale = 0.75F;
             height += statLinesCount * ((int)(textRenderer.lineHeight * scale) + 3);
         }
-        
+
         return height + 15; // Safety margin
     }
 
@@ -164,18 +165,18 @@ public class RecipePopupRenderer {
                        RegistryAccess dynamicRegistryManager,
                        net.minecraft.client.gui.Font textRenderer,
                        int ceiX, int ceiWidth) {
-        
+
         ResourceLocation itemId = com.ceketrum.cei.data.FavoriteItemsManager.getUniqueItemId(stack);
-        
+
         String itemDescription = ItemDescriptionManager.getInstance().getDescription(stack.getItem());
         ItemStats stats = getItemStats(stack);
-        
+
         int popupHeight = calculatePopupHeight(itemDescription, stats, textRenderer);
-        
+
         // Animation
         float alpha = 1.0f;
         float slideOffset = 0.0f;
-        
+
         Boolean isCompleted = animationCompleted.get(itemId);
         if (isCompleted != null && isCompleted) {
             alpha = 1.0f;
@@ -189,9 +190,9 @@ public class RecipePopupRenderer {
             } else {
                 popupOpenTime = existingTime;
             }
-            
+
             float animationProgress = AnimationHelper.getAnimationProgress(popupOpenTime, POPUP_ANIMATION_DURATION);
-            
+
             if (animationProgress >= 1.0f) {
                 animationCompleted.put(itemId, true);
                 alpha = 1.0f;
@@ -202,15 +203,15 @@ public class RecipePopupRenderer {
                 slideOffset = AnimationHelper.easeOut(20.0f, 0.0f, animationProgress);
             }
         }
-        
+
         // Position
         int inventoryWidth = 176;
         int inventoryX = (screenWidth - inventoryWidth) / 2;
         int shadowOffset = 3;
-        
+
         int preferredX;
         com.ceketrum.cei.config.CeiConfig config = com.ceketrum.cei.config.CeiConfig.getInstance();
-        
+
         if (config.isPanelOnLeft()) {
             preferredX = (int) (ceiX + ceiWidth + 10 + slideOffset);
             if (preferredX + GuiConstants.POPUP_WIDTH > inventoryX - 10) {
@@ -228,7 +229,7 @@ public class RecipePopupRenderer {
                 }
             }
         }
-        
+
         if (preferredX + GuiConstants.POPUP_WIDTH > screenWidth - 10) {
             preferredX = screenWidth - GuiConstants.POPUP_WIDTH - 10;
         }
@@ -236,7 +237,7 @@ public class RecipePopupRenderer {
             preferredX = 10;
         }
         int startX = preferredX;
-        
+
         int preferredY = mouseY + 10;
         if (preferredY + popupHeight > screenHeight - 10) {
             preferredY = screenHeight - popupHeight - 10;
@@ -245,47 +246,47 @@ public class RecipePopupRenderer {
             preferredY = 10;
         }
         int startY = preferredY;
-        
+
         currentPopupX = startX;
         currentPopupY = startY;
-        
+
         int shadowAlpha = (int) (0x80 * alpha);
         int bgAlpha = (int) (0xC0 * alpha);
         int borderAlpha = (int) (0xFF * alpha);
         int textAlpha = (int) (0xFF * alpha);
-        
+
         // Draw background and borders (sleek glassmorphism)
-        context.fill(startX + shadowOffset, startY + shadowOffset, 
-                     startX + GuiConstants.POPUP_WIDTH + shadowOffset, startY + popupHeight + shadowOffset, 
+        context.fill(startX + shadowOffset, startY + shadowOffset,
+                     startX + GuiConstants.POPUP_WIDTH + shadowOffset, startY + popupHeight + shadowOffset,
                      shadowAlpha << 24);
-        
+
         int popupBgColor = bgAlpha << 24 | 0x121212; // sleek dark background
         GuiRenderHelper.drawRoundedBackground(context, startX, startY, GuiConstants.POPUP_WIDTH, popupHeight, 10, popupBgColor);
         int popupBorderColor = borderAlpha << 24 | 0x3a3a3a;
         context.renderOutline(startX, startY, GuiConstants.POPUP_WIDTH, popupHeight, popupBorderColor);
-        
+
         // Draw Header (Item Name)
         String itemName = stack.getHoverName().getString();
         int maxNameWidth = GuiConstants.POPUP_WIDTH - 20;
         String truncatedName = TextRenderHelper.truncateText(itemName, maxNameWidth, textRenderer);
         int itemNameWidth = textRenderer.width(truncatedName);
         int itemNameColor = textAlpha << 24 | 0xFFFFFF;
-        context.drawString(textRenderer, Component.literal(truncatedName).withStyle(ChatFormatting.GOLD), 
+        context.drawString(textRenderer, Component.literal(truncatedName).withStyle(ChatFormatting.GOLD),
                         startX + (GuiConstants.POPUP_WIDTH - itemNameWidth) / 2, startY + 8, itemNameColor, false);
         int separatorColor = borderAlpha << 24 | 0x2e2e2e;
         context.fill(startX + 10, startY + 20, startX + GuiConstants.POPUP_WIDTH - 10, startY + 21, separatorColor);
-        
+
         int currentY = startY + 25;
-        
+
         // Draw Description
         if (!itemDescription.isEmpty()) {
             int descMaxWidth = GuiConstants.POPUP_WIDTH - 20;
             float scale = 0.75F;
             int descColor = (int) (0xDD * alpha) << 24 | 0xDDDDDD;
-            currentY = TextRenderHelper.drawWrappedText(context, itemDescription, startX + 10, currentY, 
+            currentY = TextRenderHelper.drawWrappedText(context, itemDescription, startX + 10, currentY,
                                                         descMaxWidth, descColor, scale, 4, textRenderer);
         }
-        
+
         // Draw Stats Separator
         boolean hasAnyStats = stats.hasDurability || stats.hasFood || stats.hasAttackDamage || stats.hasAttackSpeed || stats.hasArmor || stats.hasToughness;
         if (hasAnyStats) {
@@ -296,22 +297,22 @@ public class RecipePopupRenderer {
             } else {
                 currentY += 2;
             }
-            
+
             String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
             boolean isFr = lang != null && lang.toLowerCase().startsWith("fr");
-            
+
             // Labels
-            String durabilityLabel = isFr ? "Durabilité" : "Durability";
-            String foodLabel = isFr ? "Nourriture" : "Food";
-            String saturationLabel = isFr ? "Saturation" : "Saturation";
-            String damageLabel = isFr ? "Dégâts" : "Damage";
-            String speedLabel = isFr ? "Vitesse d'attaque" : "Attack Speed";
-            String armorLabel = isFr ? "Armure" : "Armor";
-            String toughnessLabel = isFr ? "Robustesse" : "Toughness";
-            
+            String durabilityLabel = CeiText.t("cei.stat.durability");
+            String foodLabel = CeiText.t("cei.stat.food");
+            String saturationLabel = CeiText.t("cei.stat.saturation");
+            String damageLabel = CeiText.t("cei.stat.damage");
+            String speedLabel = CeiText.t("cei.stat.attack_speed");
+            String armorLabel = CeiText.t("cei.stat.armor");
+            String toughnessLabel = CeiText.t("cei.stat.toughness");
+
             int statColor = (int) (0xBB * alpha) << 24 | 0xAAAAAA;
             float scale = 0.75F;
-            
+
             if (stats.hasAttackDamage) {
                 String val = String.format("%s: +%.1f", damageLabel, stats.attackDamage);
                 currentY = TextRenderHelper.drawWrappedText(context, val, startX + 10, currentY, GuiConstants.POPUP_WIDTH - 20, statColor, scale, 3, textRenderer);
@@ -338,32 +339,32 @@ public class RecipePopupRenderer {
                 currentY = TextRenderHelper.drawWrappedText(context, val, startX + 10, currentY, GuiConstants.POPUP_WIDTH - 20, statColor, scale, 3, textRenderer);
             }
         }
-        
+
         long currentTime = System.currentTimeMillis();
-        popupOpenTimes.entrySet().removeIf(entry -> 
+        popupOpenTimes.entrySet().removeIf(entry ->
             currentTime - entry.getValue() > POPUP_ANIMATION_DURATION * 2);
     }
-    
+
     public boolean isRecipeAreaClicked(int mouseX, int mouseY) {
         return false;
     }
-    
+
     public boolean isResultClicked(int mouseX, int mouseY) {
         return false;
     }
-    
+
     public Object getCurrentRecipe() {
         return null;
     }
-    
+
     public Object getCurrentRecipeEntry() {
         return null;
     }
-    
+
     public int getCurrentResultX() {
         return 0;
     }
-    
+
     public int getCurrentResultY() {
         return 0;
     }

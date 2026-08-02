@@ -106,6 +106,13 @@ public class CeiItemInfoScreen extends Screen {
 
     private final List<RecipeCategory> categories = new ArrayList<>();
     private RecipeCategory activeCategory;
+
+    /** Onglets de categorie affiches simultanement dans la colonne de gauche. */
+    private static final int MAX_VISIBLE_CATEGORIES = 6;
+    /** Hauteur des boutons de defilement. */
+    private static final int SCROLL_BTN_H = 12;
+    /** Index du premier onglet affiche. */
+    private int categoryScroll = 0;
     private int currentPage = 0;
 
     // Recipes database for target item (Output)
@@ -291,6 +298,9 @@ public class CeiItemInfoScreen extends Screen {
 
     private void updateCategories() {
         categories.clear();
+        // La colonne change de contenu : on revient en haut, sinon on peut
+        // rester bloque sur une fenetre qui n'existe plus.
+        categoryScroll = 0;
         if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
             boolean useUsages = (activeMainTab == TabType.USAGES);
             var craftList = useUsages ? craftingUsages : craftingRecipes;
@@ -527,13 +537,103 @@ public class CeiItemInfoScreen extends Screen {
         }
     }
 
+
+    /**
+     * Index du premier onglet affiche, borne a la volee.
+     *
+     * Le bornage est fait ici et non au moment du clic : la liste des
+     * categories change quand on passe de "Fabrication" a "Utilisations", et
+     * elle peut raccourcir. Un decalage devenu trop grand afficherait une
+     * colonne vide sans aucun moyen d'en sortir.
+     */
+    private int firstVisibleCategory() {
+        int max = Math.max(0, categories.size() - MAX_VISIBLE_CATEGORIES);
+        if (categoryScroll > max) categoryScroll = max;
+        if (categoryScroll < 0) categoryScroll = 0;
+        return categoryScroll;
+    }
+
+    /** Index de fin (exclu) de la fenetre affichee. */
+    private int lastVisibleCategory() {
+        return Math.min(categories.size(), firstVisibleCategory() + MAX_VISIBLE_CATEGORIES);
+    }
+
+    /** Y a-t-il assez de categories pour qu'on ait besoin de defiler ? */
+    private boolean categoriesScrollable() {
+        return categories.size() > MAX_VISIBLE_CATEGORIES;
+    }
+
+    /**
+     * Ordonnee du premier onglet.
+     *
+     * Sans fleches, la colonne demarre a la meme hauteur que celle de droite.
+     * Avec fleches, elle descend juste ce qu'il faut pour que celle du haut
+     * tienne dans le cadre : la colonne complete mesure 180 pixels pour un
+     * panneau de 179, elle s'y loge exactement.
+     */
+    private int categoryTabsTop() {
+        return categoriesScrollable() ? containerY + SCROLL_BTN_H + 2 : containerY + 10;
+    }
+
+    private int categoryScrollUpY() {
+        return containerY;
+    }
+
+    /**
+     * Calee sur le bord inferieur du panneau, sauf si celui-ci est trop court
+     * pour les six onglets -- auquel cas elle se contente de passer dessous.
+     */
+    private int categoryScrollDownY() {
+        int belowTabs = categoryTabsTop() + (MAX_VISIBLE_CATEGORIES - 1) * 26 + 24;
+        return Math.max(belowTabs, containerY + containerHeight - SCROLL_BTN_H);
+    }
+
+    private boolean categoryScrollHit(double mouseX, double mouseY, int y) {
+        int x = containerX - 24;
+        return mouseX >= x && mouseX < x + 27 && mouseY >= y && mouseY < y + SCROLL_BTN_H;
+    }
+
+    /** Fleches de defilement de la colonne d'onglets. */
+    private void drawCategoryScrollArrows(DrawContext context, int mouseX, int mouseY) {
+        if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
+        if (!categoriesScrollable()) return;
+
+        if (firstVisibleCategory() > 0) {
+            drawScrollButton(context, categoryScrollUpY(), true, mouseX, mouseY);
+        }
+        if (lastVisibleCategory() < categories.size()) {
+            drawScrollButton(context, categoryScrollDownY(), false, mouseX, mouseY);
+        }
+    }
+
+    private void drawScrollButton(DrawContext context, int y, boolean up, int mouseX, int mouseY) {
+        int x = containerX - 24;
+        boolean hovered = mouseX >= x && mouseX < x + 27 && mouseY >= y && mouseY < y + SCROLL_BTN_H;
+
+        GuiRenderHelper.drawRoundedBackground(context, x, y, 27, SCROLL_BTN_H, 4,
+                hovered ? 0xAA2D2D2D : 0xD9141414);
+        context.drawBorder(x, y, 27, SCROLL_BTN_H, hovered ? 0x66FFFFFF : 0x22FFFFFF);
+
+        // Triangle dessine au pixel : la police ne garantit pas les caracteres
+        // de fleche dans toutes les langues, et un pack de ressources peut les
+        // remplacer par n'importe quoi.
+        int cx = x + 13;
+        int top = y + 4;
+        int tint = 0xFFFFFFFF;
+        for (int r = 0; r < 4; r++) {
+            int w = up ? (r * 2 + 1) : ((3 - r) * 2 + 1);
+            context.fill(cx - w / 2, top + r, cx + w / 2 + 1, top + r + 1, tint);
+        }
+    }
+
     private void drawCategoryTabsBackground(DrawContext context, int mouseX, int mouseY) {
         if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
 
-        for (int i = 0; i < categories.size(); i++) {
+        int first = firstVisibleCategory();
+        for (int i = first; i < lastVisibleCategory(); i++) {
             RecipeCategory cat = categories.get(i);
             int tabX = containerX - 24;
-            int tabY = containerY + 10 + i * 26;
+            int tabY = categoryTabsTop() + (i - first) * 26;
 
             boolean active = (cat.equals(activeCategory));
             boolean hovered = mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22;
@@ -542,15 +642,18 @@ public class CeiItemInfoScreen extends Screen {
             GuiRenderHelper.drawRoundedBackground(context, tabX, tabY, 27, 22, 6, tabBg);
             context.drawBorder(tabX, tabY, 27, 22, active ? 0x66FFFFFF : 0x22FFFFFF);
         }
+
+        drawCategoryScrollArrows(context, mouseX, mouseY);
     }
 
     private void drawCategoryTabsIcons(DrawContext context) {
         if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
 
-        for (int i = 0; i < categories.size(); i++) {
+        int first = firstVisibleCategory();
+        for (int i = first; i < lastVisibleCategory(); i++) {
             RecipeCategory cat = categories.get(i);
             int tabX = containerX - 24;
-            int tabY = containerY + 10 + i * 26;
+            int tabY = categoryTabsTop() + (i - first) * 26;
 
             ItemStack iconStack = switch (cat.type) {
                 case CRAFTING -> new ItemStack(Items.CRAFTING_TABLE);
@@ -1154,10 +1257,11 @@ public class CeiItemInfoScreen extends Screen {
 
         // 2. Tooltips for category tabs
         if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
-            for (int i = 0; i < categories.size(); i++) {
+            int first = firstVisibleCategory();
+            for (int i = first; i < lastVisibleCategory(); i++) {
                 RecipeCategory cat = categories.get(i);
                 int tabX = containerX - 24;
-                int tabY = containerY + 10 + i * 26;
+                int tabY = categoryTabsTop() + (i - first) * 26;
 
                 if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
                     String tooltipText = switch (cat.type) {
@@ -1354,12 +1458,32 @@ public class CeiItemInfoScreen extends Screen {
             }
         }
 
+        // 2 bis. Fleches de defilement de la colonne d'onglets.
+        //         Testees AVANT les onglets : elles se trouvent juste au-dessus
+        //         et juste en dessous de la colonne, et un clic doit revenir a
+        //         la fleche, pas au premier onglet.
+        if ((activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES)
+                && categoriesScrollable()) {
+            if (firstVisibleCategory() > 0 && categoryScrollHit(mouseX, mouseY, categoryScrollUpY())) {
+                categoryScroll--;
+                MinecraftClient.getInstance().getSoundManager().play(net.minecraft.client.sound.PositionedSoundInstance.master(net.minecraft.sound.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+            if (lastVisibleCategory() < categories.size()
+                    && categoryScrollHit(mouseX, mouseY, categoryScrollDownY())) {
+                categoryScroll++;
+                MinecraftClient.getInstance().getSoundManager().play(net.minecraft.client.sound.PositionedSoundInstance.master(net.minecraft.sound.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+        }
+
         // 2. Check category tabs clicks
         if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
-            for (int i = 0; i < categories.size(); i++) {
+            int first = firstVisibleCategory();
+            for (int i = first; i < lastVisibleCategory(); i++) {
                 RecipeCategory cat = categories.get(i);
                 int tabX = containerX - 24;
-                int tabY = containerY + 10 + i * 26;
+                int tabY = categoryTabsTop() + (i - first) * 26;
 
                 if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
                     activeCategory = cat;
@@ -1740,12 +1864,19 @@ public class CeiItemInfoScreen extends Screen {
         return cleanList;
     }
 
-    private static void unpackInputObject(Object obj, List<ItemStack> list) {
-        unpackInputObject(obj, list, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+    public static void unpackInputObject(Object obj, List<ItemStack> list) {
+        unpackInputObject(obj, list, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()), 0);
     }
 
-    private static void unpackInputObject(Object obj, List<ItemStack> list, Set<Object> visited) {
-        if (obj == null || !visited.add(obj)) return;
+    /**
+     * @param depth profondeur restante. Indispensable : cette methode invoque
+     *              des accesseurs, et un accesseur qui construit son resultat
+     *              renvoie un objet neuf a chaque appel -- l'ensemble
+     *              anti-cycle, qui raisonne par identite, ne le reconnait
+     *              jamais et la descente ne s'arrete pas d'elle-meme.
+     */
+    private static void unpackInputObject(Object obj, List<ItemStack> list, Set<Object> visited, int depth) {
+        if (obj == null || depth > 8 || !visited.add(obj)) return;
 
         if (obj instanceof net.minecraft.recipe.Ingredient ing) {
             for (ItemStack match : ing.getMatchingStacks()) {
@@ -1775,7 +1906,7 @@ public class CeiItemInfoScreen extends Screen {
 
         if (obj instanceof Collection<?> col) {
             for (Object el : col) {
-                unpackInputObject(el, list, visited);
+                unpackInputObject(el, list, visited, depth + 1);
             }
             return;
         }
@@ -1783,14 +1914,14 @@ public class CeiItemInfoScreen extends Screen {
         if (obj.getClass().isArray()) {
             int length = java.lang.reflect.Array.getLength(obj);
             for (int i = 0; i < length; i++) {
-                unpackInputObject(java.lang.reflect.Array.get(obj, i), list, visited);
+                unpackInputObject(java.lang.reflect.Array.get(obj, i), list, visited, depth + 1);
             }
             return;
         }
 
         if (obj instanceof java.util.Optional<?> opt) {
             if (opt.isPresent()) {
-                unpackInputObject(opt.get(), list, visited);
+                unpackInputObject(opt.get(), list, visited, depth + 1);
             }
             return;
         }
@@ -1813,7 +1944,7 @@ public class CeiItemInfoScreen extends Screen {
                     f.setAccessible(true);
                     Object val = f.get(obj);
                     if (val != null) {
-                        unpackInputObject(val, list, visited);
+                        unpackInputObject(val, list, visited, depth + 1);
                     }
                 } catch (Exception e) {}
             }
@@ -1832,7 +1963,7 @@ public class CeiItemInfoScreen extends Screen {
                         m.setAccessible(true);
                         Object val = m.invoke(obj);
                         if (val != null) {
-                            unpackInputObject(val, list, visited);
+                            unpackInputObject(val, list, visited, depth + 1);
                         }
                     } catch (Exception e) {}
                 }

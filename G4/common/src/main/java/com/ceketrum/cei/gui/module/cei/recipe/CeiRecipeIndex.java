@@ -68,6 +68,7 @@ public final class CeiRecipeIndex {
 
     /** Vide l'index. A appeler a la deconnexion ; la reconstruction est paresseuse. */
     public static synchronized void invalidate() {
+        com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeAdapter.invalidate();
         BY_OUTPUT.clear();
         BY_INPUT.clear();
         builtFrom = null;
@@ -169,7 +170,7 @@ public final class CeiRecipeIndex {
             for (ItemStack out : customOutputs.apply(recipe, registries)) {
                 if (out != null && !out.isEmpty()) produced.add(out.getItem());
             }
-        } catch (Exception | LinkageError e) {
+        } catch (Exception | StackOverflowError | LinkageError e) {
             // une recette moddee peut lever : elle est simplement absente de
             // l'index cote sorties, comme elle l'etait de l'ancien balayage
         }
@@ -181,14 +182,14 @@ public final class CeiRecipeIndex {
                     if (match != null && !match.isEmpty()) consumed.add(match.getItem());
                 }
             }
-        } catch (Exception | LinkageError e) {
+        } catch (Exception | StackOverflowError | LinkageError e) {
             // idem
         }
         try {
             for (ItemStack in : customInputs.apply(recipe)) {
                 if (in != null && !in.isEmpty()) consumed.add(in.getItem());
             }
-        } catch (Exception | LinkageError e) {
+        } catch (Exception | StackOverflowError | LinkageError e) {
             // idem
         }
 

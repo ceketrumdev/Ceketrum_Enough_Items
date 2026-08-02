@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "package": "com.ceketrum.cei.mixin.client",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "client-cei-refmap.json",
+  "client": [
+    "CeiScreenInjectionMixin",
+    "CeiRecipeBookScreenMixin",
+    "CeiMouseInjectionMixin",
+    "CeiKeyboardInjectionMixin",
+    "HandledScreenAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

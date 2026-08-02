@@ -1,0 +1,19 @@
+// Racine du build autonome G1-DEV.
+//
+// Difference avec G1/build.gradle : la version du plugin Loom est declaree ICI.
+// En build racine, G1 l'heritait du build.gradle de la racine du depot ; le
+// labo etant autonome, il doit la porter lui-meme, sinon
+// « Plugin [id: 'dev.architectury.loom'] was not found ».
+plugins {
+    id 'dev.architectury.loom' version '1.14.476' apply false
+    id 'idea'
+    id 'eclipse'
+}
+
+allprojects {
+    apply plugin: 'idea'
+    apply plugin: 'eclipse'
+
+    group = 'com.ceketrum'
+    version = '0.1.4-DEV'
+}
