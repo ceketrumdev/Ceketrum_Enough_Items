@@ -1,5 +1,6 @@
 package com.ceketrum.cei.gui.module.cei.components;
 
+import com.ceketrum.cei.i18n.CeiText;
 import com.ceketrum.cei.data.ItemDescriptionManager;
 import com.ceketrum.cei.gui.constants.GuiConstants;
 import com.ceketrum.cei.gui.module.cei.util.AnimationHelper;
@@ -300,17 +301,15 @@ public class RecipePopupRenderer {
                 currentY += 2;
             }
             
-            String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
-            boolean isFr = lang != null && lang.toLowerCase().startsWith("fr");
             
             // Labels
-            String durabilityLabel = isFr ? "Durabilité" : "Durability";
-            String foodLabel = isFr ? "Nourriture" : "Food";
-            String saturationLabel = isFr ? "Saturation" : "Saturation";
-            String damageLabel = isFr ? "Dégâts" : "Damage";
-            String speedLabel = isFr ? "Vitesse d'attaque" : "Attack Speed";
-            String armorLabel = isFr ? "Armure" : "Armor";
-            String toughnessLabel = isFr ? "Robustesse" : "Toughness";
+            String durabilityLabel = CeiText.t("cei.stat.durability");
+            String foodLabel = CeiText.t("cei.stat.food");
+            String saturationLabel = CeiText.t("cei.stat.saturation");
+            String damageLabel = CeiText.t("cei.stat.damage");
+            String speedLabel = CeiText.t("cei.stat.attack_speed");
+            String armorLabel = CeiText.t("cei.stat.armor");
+            String toughnessLabel = CeiText.t("cei.stat.toughness");
             
             int statColor = (int) (0xBB * alpha) << 24 | 0xAAAAAA;
             float scale = 0.75F;

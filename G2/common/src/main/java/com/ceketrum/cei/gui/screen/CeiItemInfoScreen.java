@@ -1,5 +1,6 @@
 package com.ceketrum.cei.gui.screen;
 
+import com.ceketrum.cei.i18n.CeiText;
 import com.ceketrum.cei.data.BrewingRecipeManager;
 import com.ceketrum.cei.data.ItemDescriptionManager;
 import com.ceketrum.cei.data.LootTableSourceManager;
@@ -150,7 +151,7 @@ public class CeiItemInfoScreen extends Screen {
     private RenderedSlot hoveredSlot = null;
 
     public CeiItemInfoScreen(Screen parentScreen, ItemStack targetStack, boolean isUsage) {
-        super(Text.literal("CEI Item Info"));
+        super(Text.literal(CeiText.t("cei.screen.item_info")));
         this.parentScreen = parentScreen;
         this.targetStack = targetStack.copy();
         this.isUsage = isUsage;
@@ -288,7 +289,13 @@ public class CeiItemInfoScreen extends Screen {
         // World location eligibility
         List<String> locations = LootTableSourceManager.getInstance().getWorldLocationsForItem(targetStack.getItem());
         List<String> blockGen = BlockGenerationManager.getInstance().getBlockGenerationSources(targetStack.getItem());
-        boolean hasWorldLocs = !locations.isEmpty() && !locations.contains("Everywhere / Not specified") && !locations.contains("Partout dans le monde / Non spécifié");
+        String worldPlaceholder = CeiText.t("cei.loot.where.unspecified");
+        // On compare a la valeur reellement produite, pas a une copie
+        // figee : les deux chaines qui etaient ici n'existaient plus
+        // depuis que le libelle est traduit, et l'onglet s'affichait
+        // donc pour des items qui n'avaient rien a y montrer.
+        boolean hasWorldLocs = !locations.isEmpty()
+                && !(locations.size() == 1 && locations.contains(worldPlaceholder));
         boolean hasBlockGen = !blockGen.isEmpty();
 
         if (hasWorldLocs || hasBlockGen) {
@@ -301,6 +308,7 @@ public class CeiItemInfoScreen extends Screen {
         // La colonne change de contenu : on revient en haut, sinon on peut
         // rester bloque sur une fenetre qui n'existe plus.
         categoryScroll = 0;
+        categoryScrollAnim = 0f;   // pas de glissement a l'ouverture
         if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
             boolean useUsages = (activeMainTab == TabType.USAGES);
             var craftList = useUsages ? craftingUsages : craftingRecipes;
@@ -533,7 +541,7 @@ public class CeiItemInfoScreen extends Screen {
                 case WORLD -> new ItemStack(Items.COMPASS);
             };
 
-            context.drawItem(iconStack, tabX + 6, tabY + 3);
+            drawStack(context, iconStack, tabX + 6, tabY + 3);
         }
     }
 
@@ -546,6 +554,114 @@ public class CeiItemInfoScreen extends Screen {
      * elle peut raccourcir. Un decalage devenu trop grand afficherait une
      * colonne vide sans aucun moyen d'en sortir.
      */
+
+    /**
+     * Position courante du defilement, en onglets, avec sa partie
+     * fractionnaire.
+     *
+     * categoryScroll est la cible, entiere : c'est elle qui dit quels onglets
+     * sont "visibles". Celle-ci est ce qu'on DESSINE, et elle la rejoint
+     * progressivement. Les deux sont necessaires : confondre la cible et la
+     * position rendrait le clic dependant de l'animation en cours.
+     */
+    private float categoryScrollAnim = 0f;
+    private long categoryScrollNanos = 0L;
+
+    /**
+     * Rapproche la position dessinee de la cible.
+     *
+     * Amortissement exponentiel plutot qu'un pas fixe par image : un pas fixe
+     * defile deux fois plus vite a 120 images par seconde qu'a 60. Ici la
+     * fraction rattrapee depend du temps ecoule, pas du nombre d'images.
+     *
+     * Le delta est plafonne : apres une pause du jeu ou un chargement, un
+     * ecart d'une seconde ferait sauter l'animation d'un coup, ce qui revient
+     * a ne pas en avoir.
+     */
+    private void stepCategoryScroll() {
+        long now = System.nanoTime();
+        float dt = (categoryScrollNanos == 0L) ? 0f
+                : Math.min(0.1f, (now - categoryScrollNanos) / 1_000_000_000f);
+        categoryScrollNanos = now;
+
+        float target = firstVisibleCategory();
+        float delta = target - categoryScrollAnim;
+        if (Math.abs(delta) < 0.002f) {
+            categoryScrollAnim = target;
+            return;
+        }
+        categoryScrollAnim += delta * (1f - (float) Math.exp(-16.0 * dt));
+    }
+
+    /** Ordonnee d'un onglet, animation comprise. */
+    private int categoryTabY(int index) {
+        return categoryTabsTop() + Math.round((index - categoryScrollAnim) * 26f);
+    }
+
+    /**
+     * Premier onglet a DESSINER : un cran avant le premier onglet visible.
+     *
+     * Pendant le glissement un onglet deborde par le haut de la bande. Ne pas
+     * le dessiner ferait apparaitre les onglets d'un coup au lieu de les faire
+     * entrer.
+     */
+    private int categoryDrawFrom() {
+        firstVisibleCategory();   // borne categoryScroll si la liste a raccourci
+        return Math.max(0, (int) Math.floor(categoryScrollAnim) - 1);
+    }
+
+    /** Fin (exclue) de la fenetre dessinee, un cran apres le dernier visible. */
+    private int categoryDrawTo() {
+        return Math.min(categories.size(),
+                (int) Math.ceil(categoryScrollAnim) + MAX_VISIBLE_CATEGORIES + 1);
+    }
+
+    /** Haut de la bande visible. */
+    private int categoryBandTop() {
+        return categoryTabsTop();
+    }
+
+    /** Bas de la bande : exactement six onglets, le dernier compris. */
+    private int categoryBandBottom() {
+        return categoryTabsTop() + (MAX_VISIBLE_CATEGORIES - 1) * 26 + 22;
+    }
+
+    /**
+     * Le curseur est-il sur cet onglet ?
+     *
+     * La zone est rognee par la bande : pendant le glissement un onglet
+     * deborde, et on ne doit pouvoir cliquer que ce qu'on voit.
+     */
+    private boolean categoryTabHit(int tabX, int tabY, double mouseX, double mouseY) {
+        int top = Math.max(tabY, categoryBandTop());
+        int bottom = Math.min(tabY + 22, categoryBandBottom());
+        return bottom > top
+                && mouseX >= tabX && mouseX < tabX + 24
+                && mouseY >= top && mouseY < bottom;
+    }
+
+    /**
+     * Molette sur la colonne d'onglets.
+     *
+     * L'evenement est consomme des que le curseur est sur la colonne, meme si
+     * on est deja en butee : sinon la liste d'items se mettrait a defiler
+     * derriere alors qu'on visait manifestement la colonne.
+     */
+    private boolean categoryWheel(double mouseX, double mouseY, double amount) {
+        if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return false;
+        if (!categoriesScrollable()) return false;
+
+        int x = containerX - 24;
+        if (mouseX < x || mouseX >= x + 27) return false;
+        if (mouseY < categoryScrollUpY()
+                || mouseY >= categoryScrollDownY() + SCROLL_BTN_H) return false;
+
+        int max = Math.max(0, categories.size() - MAX_VISIBLE_CATEGORIES);
+        int step = (amount > 0) ? -1 : (amount < 0 ? 1 : 0);
+        categoryScroll = Math.max(0, Math.min(max, categoryScroll + step));
+        return true;
+    }
+
     private int firstVisibleCategory() {
         int max = Math.max(0, categories.size() - MAX_VISIBLE_CATEGORIES);
         if (categoryScroll > max) categoryScroll = max;
@@ -627,33 +743,61 @@ public class CeiItemInfoScreen extends Screen {
     }
 
     private void drawCategoryTabsBackground(DrawContext context, int mouseX, int mouseY) {
+        // Une seule fois par image : c'est la premiere des deux
+        // passes de dessin de la colonne.
+        stepCategoryScroll();
         if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
 
-        int first = firstVisibleCategory();
-        for (int i = first; i < lastVisibleCategory(); i++) {
+        int first = categoryDrawFrom();
+        // Ce qui glisse doit etre coupe : pendant l'animation les onglets
+        // qui entrent et sortent depassent de la bande.
+        context.enableScissor(containerX - 24, categoryBandTop(),
+                containerX - 24 + 27, categoryBandBottom());
+        for (int i = first; i < categoryDrawTo(); i++) {
             RecipeCategory cat = categories.get(i);
             int tabX = containerX - 24;
-            int tabY = categoryTabsTop() + (i - first) * 26;
+            int tabY = categoryTabY(i);
 
             boolean active = (cat.equals(activeCategory));
-            boolean hovered = mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22;
+            boolean hovered = categoryTabHit(tabX, tabY, mouseX, mouseY);
 
             int tabBg = active ? 0xD9222222 : (hovered ? 0xAA2D2D2D : 0xD9141414);
             GuiRenderHelper.drawRoundedBackground(context, tabX, tabY, 27, 22, 6, tabBg);
             context.drawBorder(tabX, tabY, 27, 22, active ? 0x66FFFFFF : 0x22FFFFFF);
         }
 
+        context.disableScissor();
+
         drawCategoryScrollArrows(context, mouseX, mouseY);
+    }
+
+
+    /**
+     * Dessine une pile AVEC sa quantite.
+     *
+     * drawItem() ne dessine que la texture ; le nombre vient de
+     * drawItemInSlot(), la meme methode que le jeu utilise pour l'inventaire.
+     * Elle n'ecrit rien quand la quantite vaut 1, ce qui evite d'avoir a
+     * distinguer les cases de recette des icones d'onglet.
+     */
+    private void drawStack(DrawContext context, ItemStack stack, int x, int y) {
+        if (stack == null || stack.isEmpty()) return;
+        context.drawItem(stack, x, y);
+        context.drawItemInSlot(net.minecraft.client.MinecraftClient.getInstance().textRenderer, stack, x, y);
     }
 
     private void drawCategoryTabsIcons(DrawContext context) {
         if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
 
-        int first = firstVisibleCategory();
-        for (int i = first; i < lastVisibleCategory(); i++) {
+        int first = categoryDrawFrom();
+        // Ce qui glisse doit etre coupe : pendant l'animation les onglets
+        // qui entrent et sortent depassent de la bande.
+        context.enableScissor(containerX - 24, categoryBandTop(),
+                containerX - 24 + 27, categoryBandBottom());
+        for (int i = first; i < categoryDrawTo(); i++) {
             RecipeCategory cat = categories.get(i);
             int tabX = containerX - 24;
-            int tabY = categoryTabsTop() + (i - first) * 26;
+            int tabY = categoryTabY(i);
 
             ItemStack iconStack = switch (cat.type) {
                 case CRAFTING -> new ItemStack(Items.CRAFTING_TABLE);
@@ -682,8 +826,9 @@ public class CeiItemInfoScreen extends Screen {
                 }
             };
 
-            context.drawItem(iconStack, tabX + 4, tabY + 3);
+            drawStack(context, iconStack, tabX + 4, tabY + 3);
         }
+        context.disableScissor();
     }
 
     private void drawTabContent(DrawContext context, int mouseX, int mouseY) {
@@ -692,14 +837,12 @@ public class CeiItemInfoScreen extends Screen {
         int contentWidth = containerWidth - 30;
         int contentHeight = containerHeight - 45;
 
-        String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
-        boolean isFr = lang != null && lang.toLowerCase().startsWith("fr");
 
         switch (activeMainTab) {
             case DESCRIPTION: {
                 String desc = ItemDescriptionManager.getInstance().getDescription(targetStack.getItem());
                 if (desc.isEmpty()) {
-                    desc = isFr ? "Aucune description disponible pour cet item." : "No description available for this item.";
+                    desc = CeiText.t("cei.info.no_description");
                 }
 
                 // Real stats integration in description tab
@@ -713,7 +856,7 @@ public class CeiItemInfoScreen extends Screen {
                     context.fill(contentX, currY, contentX + contentWidth, currY + 1, 0x22FFFFFF);
                     currY += 6;
 
-                    String statsTitle = isFr ? "Statistiques :" : "Statistics:";
+                    String statsTitle = CeiText.t("cei.info.statistics");
                     context.drawText(this.textRenderer, statsTitle, contentX, currY, 0xFFD700, false);
                     currY += 11;
 
@@ -721,28 +864,28 @@ public class CeiItemInfoScreen extends Screen {
                     float scale = 0.75f;
 
                     if (stats.hasAttackDamage) {
-                        String val = String.format("%s: +%.1f", isFr ? "Dégâts" : "Damage", stats.attackDamage);
+                        String val = String.format("%s: +%.1f", CeiText.t("cei.stat.damage"), stats.attackDamage);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.textRenderer);
                     }
                     if (stats.hasAttackSpeed) {
                         double speed = 4.0 + stats.attackSpeed;
-                        String val = String.format("%s: %.1f", isFr ? "Vitesse d'attaque" : "Attack Speed", speed);
+                        String val = String.format("%s: %.1f", CeiText.t("cei.stat.attack_speed"), speed);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.textRenderer);
                     }
                     if (stats.hasArmor) {
-                        String val = String.format("%s: +%.0f", isFr ? "Armure" : "Armor", stats.armor);
+                        String val = String.format("%s: +%.0f", CeiText.t("cei.stat.armor"), stats.armor);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.textRenderer);
                     }
                     if (stats.hasToughness) {
-                        String val = String.format("%s: +%.0f", isFr ? "Robustesse" : "Toughness", stats.toughness);
+                        String val = String.format("%s: +%.0f", CeiText.t("cei.stat.toughness"), stats.toughness);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.textRenderer);
                     }
                     if (stats.hasFood) {
-                        String val = String.format("%s: +%d (Saturation: +%.1f)", isFr ? "Nourriture" : "Food", stats.foodPoints, stats.saturation);
+                        String val = String.format("%s: +%d (Saturation: +%.1f)", CeiText.t("cei.stat.food"), stats.foodPoints, stats.saturation);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.textRenderer);
                     }
                     if (stats.hasDurability) {
-                        String val = String.format("%s: %d / %d", isFr ? "Durabilité" : "Durability", stats.durability, stats.maxDurability);
+                        String val = String.format("%s: %d / %d", CeiText.t("cei.stat.durability"), stats.durability, stats.maxDurability);
                         currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.textRenderer);
                     }
                 }
@@ -751,18 +894,18 @@ public class CeiItemInfoScreen extends Screen {
             case CRAFTING:
             case USAGES: {
                 if (activeCategory == null || getActiveRecipesList().isEmpty()) {
-                    String emptyMsg = isFr ? (activeMainTab == TabType.CRAFTING ? "Aucune recette de craft." : "Aucun usage de craft.")
-                                           : (activeMainTab == TabType.CRAFTING ? "No recipes found." : "No usages found.");
+                    String emptyMsg = CeiText.t(activeMainTab == TabType.CRAFTING
+                            ? "cei.info.no_recipes" : "cei.info.no_usages");
                     int msgW = this.textRenderer.getWidth(emptyMsg);
                     context.drawText(this.textRenderer, emptyMsg, contentX + (contentWidth - msgW) / 2, contentY + 40, 0xFFFF0000, false);
                 } else {
-                    drawRecipeContent(context, mouseX, mouseY, contentX, contentY, contentWidth, contentHeight, isFr);
+                    drawRecipeContent(context, mouseX, mouseY, contentX, contentY, contentWidth, contentHeight);
                 }
                 break;
             }
             case LOOT: {
                 List<String> lootSources = LootTableSourceManager.getInstance().getSourcesForItem(targetStack.getItem());
-                String header = isFr ? "Sources d'Obtention :" : "Obtaining Sources:";
+                String header = CeiText.t("cei.info.obtaining_sources");
                 context.drawText(this.textRenderer, header, contentX, contentY, 0xFFD700, false);
                 int currY = contentY + 14;
 
@@ -780,20 +923,23 @@ public class CeiItemInfoScreen extends Screen {
 
                 // Remove duplicates and placeholders
                 Set<String> uniqueLocs = new LinkedHashSet<>();
-                String placeholderFr = "Partout dans le monde / Non spécifié";
-                String placeholderEn = "Everywhere / Not specified";
+                // Un seul libelle de repli, partage avec LootTableSourceManager.
+                // Avant, deux chaines codees en dur servaient a la fois de
+                // valeur et de filtre : il suffisait qu'une des deux bouge
+                // pour que le doublon reapparaisse a l'ecran.
+                String placeholder = CeiText.t("cei.loot.where.unspecified");
 
                 for (String loc : locations) {
-                    if (!loc.equals(placeholderFr) && !loc.equals(placeholderEn)) {
+                    if (!loc.equals(placeholder)) {
                         uniqueLocs.add(loc);
                     }
                 }
 
                 if (uniqueLocs.isEmpty()) {
-                    uniqueLocs.add(isFr ? placeholderFr : placeholderEn);
+                    uniqueLocs.add(placeholder);
                 }
 
-                String header = isFr ? "Biomes et Structures :" : "Biomes and Structures:";
+                String header = CeiText.t("cei.info.biomes_structures");
                 context.drawText(this.textRenderer, header, contentX, contentY, 0xFFD700, false);
                 int currY = contentY + 14;
 
@@ -805,7 +951,7 @@ public class CeiItemInfoScreen extends Screen {
         }
     }
 
-    private void drawRecipeContent(DrawContext context, int mouseX, int mouseY, int contentX, int contentY, int contentWidth, int contentHeight, boolean isFr) {
+    private void drawRecipeContent(DrawContext context, int mouseX, int mouseY, int contentX, int contentY, int contentWidth, int contentHeight) {
         List<?> list = getActiveRecipesList();
         if (currentPage >= list.size()) currentPage = 0;
         Object recipeObj = list.get(currentPage);
@@ -830,23 +976,23 @@ public class CeiItemInfoScreen extends Screen {
         };
 
         String catName = switch (activeCategory.type) {
-            case CRAFTING -> isFr ? "Table de Craft" : "Crafting Table";
-            case SMELTING -> isFr ? "Fourneau" : "Furnace";
-            case BREWING -> isFr ? "Alambic" : "Brewing Stand";
-            case STONECUTTING -> isFr ? "Tailleur de Pierre" : "Stonecutter";
-            case SMITHING -> isFr ? "Table de Forgeron" : "Smithing Table";
+            case CRAFTING -> CeiText.t("cei.station.crafting_table");
+            case SMELTING -> CeiText.t("cei.station.furnace");
+            case BREWING -> CeiText.t("cei.station.brewing_stand");
+            case STONECUTTING -> CeiText.t("cei.station.stonecutter");
+            case SMITHING -> CeiText.t("cei.station.smithing_table");
             case CUSTOM -> {
                 // Le libelle vient desormais du type de recette lui-meme :
                 // create:crushing doit s'afficher "Crushing Wheel", pas
                 // "Custom Machine". Cf. CeiRecipeStation.
                 if (finalRecipe != null) {
-                    yield getMachineLabel(finalRecipe, isFr);
+                    yield getMachineLabel(finalRecipe);
                 }
-                yield isFr ? "Machine Spéciale" : "Custom Machine";
+                yield CeiText.t("cei.station.custom");
             }
         };
 
-        context.drawItem(titleIcon, contentX, contentY - 4);
+        drawStack(context, titleIcon, contentX, contentY - 4);
         activeSlots.add(new RenderedSlot(titleIcon, contentX, contentY - 4, 16));
         context.drawText(this.textRenderer, catName, contentX + 20, contentY, 0xFFD700, false);
 
@@ -875,7 +1021,7 @@ public class CeiItemInfoScreen extends Screen {
                         }
 
                         if (inputStack != null && !inputStack.isEmpty()) {
-                            context.drawItem(inputStack, slotX + 1, slotY + 1);
+                            drawStack(context, inputStack, slotX + 1, slotY + 1);
                             activeSlots.add(new RenderedSlot(inputStack, slotX, slotY, 18));
                         }
                     }
@@ -912,7 +1058,7 @@ public class CeiItemInfoScreen extends Screen {
                 drawSlotBg(context, outputX, outputY);
                 try {
                     ItemStack outStack = recipe.getResult(rm);
-                    context.drawItem(outStack, outputX + 1, outputY + 1);
+                    drawStack(context, outStack, outputX + 1, outputY + 1);
                     activeSlots.add(new RenderedSlot(outStack, outputX, outputY, 18));
                 } catch (Exception e) {}
                 break;
@@ -929,7 +1075,7 @@ public class CeiItemInfoScreen extends Screen {
                 List<Ingredient> ingredients = recipe.getIngredients();
                 if (!ingredients.isEmpty() && ingredients.get(0).getMatchingStacks().length > 0) {
                     ItemStack inStack = ingredients.get(0).getMatchingStacks()[0];
-                    context.drawItem(inStack, slotX + 1, slotY + 1);
+                    drawStack(context, inStack, slotX + 1, slotY + 1);
                     activeSlots.add(new RenderedSlot(inStack, slotX, slotY, 18));
                 }
 
@@ -941,7 +1087,7 @@ public class CeiItemInfoScreen extends Screen {
                 drawSlotBg(context, outX, slotY);
                 try {
                     ItemStack outStack = recipe.getResult(rm);
-                    context.drawItem(outStack, outX + 1, slotY + 1);
+                    drawStack(context, outStack, outX + 1, slotY + 1);
                     activeSlots.add(new RenderedSlot(outStack, outX, slotY, 18));
                 } catch (Exception e) {}
                 break;
@@ -949,34 +1095,62 @@ public class CeiItemInfoScreen extends Screen {
             case BREWING: {
                 BrewingRecipeManager.BrewingRecipe recipe = (BrewingRecipeManager.BrewingRecipe) recipeObj;
 
-                int gridStartX = contentX + 25;
-                int gridStartY = contentY + 14;
+                // Disposition en alambic. L'ingredient est au-dessus et sa
+                // fleche descend SUR la fleche base -> resultat : les deux
+                // apports convergent la ou la transformation a lieu.
+                //
+                // L'ancienne version posait tout a contentX + 25 / contentY + 14,
+                // une position fixe sans rapport avec la taille de la zone, avec
+                // une fleche descendante qui ne rejoignait rien et aucune fleche
+                // entre les deux potions.
+                // On centre la RECETTE seule. Le carburant n'en fait pas
+                // partie : le compter dans la largeur centree decalait toute la
+                // recette vers la droite de la moitie de ce qu'il occupe.
+                // Ainsi l'ingredient et sa fleche tombent pile au milieu du
+                // panneau, ce qui est le repere que l'oeil suit.
+                int recipeW = BREW_SLOT + BREW_ARROW_GAP + BREW_SLOT;
+                int blockH = BREW_SLOT + BREW_DROP + BREW_SLOT;
 
-                // Ingredient (top slot)
-                int ingX = gridStartX + 25;
-                int ingY = gridStartY;
-                drawSlotBg(context, ingX, ingY);
-                context.drawItem(recipe.ingredient, ingX + 1, ingY + 1);
-                activeSlots.add(new RenderedSlot(recipe.ingredient, ingX, ingY, 18));
+                int topY = contentY + BREW_HEADER
+                        + Math.max(0, (contentHeight - BREW_HEADER - blockH) / 2);
 
-                // Arrow pointing down
-                context.fill(ingX + 8, ingY + 21, ingX + 10, ingY + 36, 0x66FFFFFF);
-                context.fill(ingX + 6, ingY + 33, ingX + 12, ingY + 35, 0x66FFFFFF);
+                int baseX = contentX + (contentWidth - recipeW) / 2;
+                int outX  = baseX + BREW_SLOT + BREW_ARROW_GAP;
+                // Borne a gauche : sur un panneau etroit le carburant se serre
+                // contre la recette plutot que d'en sortir.
+                int fuelX = Math.max(contentX, baseX - BREW_FUEL_GAP - BREW_SLOT);
+                int rowY  = topY + BREW_SLOT + BREW_DROP;
 
-                // Potions (bottom slots)
-                int potY = gridStartY + 40;
+                // Potion de base, fleche, resultat.
+                drawSlotBg(context, baseX, rowY);
+                drawStack(context, recipe.inputPotion, baseX + 1, rowY + 1);
+                activeSlots.add(new RenderedSlot(recipe.inputPotion, baseX, rowY, 18));
 
-                // Input potion (left)
-                int leftX = gridStartX;
-                drawSlotBg(context, leftX, potY);
-                context.drawItem(recipe.inputPotion, leftX + 1, potY + 1);
-                activeSlots.add(new RenderedSlot(recipe.inputPotion, leftX, potY, 18));
+                int arrowX = baseX + BREW_SLOT + (BREW_ARROW_GAP - 18) / 2;
+                drawArrow(context, arrowX, rowY + 2);
 
-                // Output potion (right)
-                int rightX = gridStartX + 50;
-                drawSlotBg(context, rightX, potY);
-                context.drawItem(recipe.outputPotion, rightX + 1, potY + 1);
-                activeSlots.add(new RenderedSlot(recipe.outputPotion, rightX, potY, 18));
+                drawSlotBg(context, outX, rowY);
+                drawStack(context, recipe.outputPotion, outX + 1, rowY + 1);
+                activeSlots.add(new RenderedSlot(recipe.outputPotion, outX, rowY, 18));
+
+                // Ingredient, centre sur la fleche, et sa descente jusqu'a elle.
+                int arrowCx = arrowX + 9;
+                int ingX = arrowCx - BREW_SLOT / 2;
+                drawSlotBg(context, ingX, topY);
+                drawStack(context, recipe.ingredient, ingX + 1, topY + 1);
+                activeSlots.add(new RenderedSlot(recipe.ingredient, ingX, topY, 18));
+                drawArrowDown(context, arrowCx, topY + BREW_SLOT + 3, BREW_DROP - 6);
+
+                // Carburant, A L'ECART : la poudre de Blaze ne fait pas partie
+                // de la recette. Collee aux autres cases elle se lirait comme un
+                // ingredient, ce qui serait faux ; le trait et l'espace disent
+                // qu'elle releve du contexte.
+                drawSlotBg(context, fuelX, rowY);
+                ItemStack fuel = new ItemStack(Items.BLAZE_POWDER);
+                drawStack(context, fuel, fuelX + 1, rowY + 1);
+                activeSlots.add(new RenderedSlot(fuel, fuelX, rowY, 18));
+                int sepX = fuelX + BREW_SLOT + BREW_FUEL_GAP / 2;
+                context.fill(sepX, rowY + 2, sepX + 1, rowY + BREW_SLOT - 2, 0x33FFFFFF);
                 break;
             }
             case STONECUTTING: {
@@ -991,7 +1165,7 @@ public class CeiItemInfoScreen extends Screen {
                 List<Ingredient> ingredients = recipe.getIngredients();
                 if (!ingredients.isEmpty() && ingredients.get(0).getMatchingStacks().length > 0) {
                     ItemStack inStack = ingredients.get(0).getMatchingStacks()[0];
-                    context.drawItem(inStack, slotX + 1, slotY + 1);
+                    drawStack(context, inStack, slotX + 1, slotY + 1);
                     activeSlots.add(new RenderedSlot(inStack, slotX, slotY, 18));
                 }
 
@@ -1003,7 +1177,7 @@ public class CeiItemInfoScreen extends Screen {
                 drawSlotBg(context, outX, slotY);
                 try {
                     ItemStack outStack = recipe.getResult(rm);
-                    context.drawItem(outStack, outX + 1, slotY + 1);
+                    drawStack(context, outStack, outX + 1, slotY + 1);
                     activeSlots.add(new RenderedSlot(outStack, outX, slotY, 18));
                 } catch (Exception e) {}
                 break;
@@ -1016,16 +1190,18 @@ public class CeiItemInfoScreen extends Screen {
                 int slotY = contentY + 28;
 
                 // 3 Inputs (Template, Base, Addition)
-                List<Ingredient> ingredients = recipe.getIngredients();
+                //
+                // Surtout pas getIngredients() : il rend une liste VIDE pour
+                // toute recette de forge, d'ou les trois cases vides. Les
+                // entrees sont dans les champs template, base et addition.
+                List<ItemStack> smithIn = smithingInputs(recipe);
                 for (int i = 0; i < 3; i++) {
                     int sX = slotX + i * 20;
                     drawSlotBg(context, sX, slotY);
-                    if (i < ingredients.size()) {
-                        ItemStack[] matching = ingredients.get(i).getMatchingStacks();
-                        if (matching.length > 0) {
-                            context.drawItem(matching[0], sX + 1, slotY + 1);
-                            activeSlots.add(new RenderedSlot(matching[0], sX, slotY, 18));
-                        }
+                    ItemStack shown = (i < smithIn.size()) ? smithIn.get(i) : ItemStack.EMPTY;
+                    if (shown != null && !shown.isEmpty()) {
+                        drawStack(context, shown, sX + 1, slotY + 1);
+                        activeSlots.add(new RenderedSlot(shown, sX, slotY, 18));
                     }
                 }
 
@@ -1037,7 +1213,7 @@ public class CeiItemInfoScreen extends Screen {
                 drawSlotBg(context, outX, slotY);
                 try {
                     ItemStack outStack = recipe.getResult(rm);
-                    context.drawItem(outStack, outX + 1, slotY + 1);
+                    drawStack(context, outStack, outX + 1, slotY + 1);
                     activeSlots.add(new RenderedSlot(outStack, outX, slotY, 18));
                 } catch (Exception e) {}
                 break;
@@ -1078,7 +1254,7 @@ public class CeiItemInfoScreen extends Screen {
                             drawSlotBg(context, slotX, slotY);
                             ItemStack stack = view.slotAt(c, r).current(now);
                             if (stack != null && !stack.isEmpty()) {
-                                context.drawItem(stack, slotX + 1, slotY + 1);
+                                drawStack(context, stack, slotX + 1, slotY + 1);
                                 activeSlots.add(new RenderedSlot(stack, slotX, slotY, 18));
                             }
                         }
@@ -1092,7 +1268,7 @@ public class CeiItemInfoScreen extends Screen {
                         drawSlotBg(context, slotX, midY);
                         ItemStack stack = i < vOutputs.size() ? vOutputs.get(i) : ItemStack.EMPTY;
                         if (stack != null && !stack.isEmpty()) {
-                            context.drawItem(stack, slotX + 1, midY + 1);
+                            drawStack(context, stack, slotX + 1, midY + 1);
                             activeSlots.add(new RenderedSlot(stack, slotX, midY, 18));
                         }
                     }
@@ -1140,7 +1316,7 @@ public class CeiItemInfoScreen extends Screen {
                     drawSlotBg(context, slotX, startY);
                     ItemStack stack = inputs.get(i);
                     if (stack != null && !stack.isEmpty()) {
-                        context.drawItem(stack, slotX + 1, startY + 1);
+                        drawStack(context, stack, slotX + 1, startY + 1);
                         activeSlots.add(new RenderedSlot(stack, slotX, startY, 18));
                     }
                 }
@@ -1156,7 +1332,7 @@ public class CeiItemInfoScreen extends Screen {
                     drawSlotBg(context, slotX, startY);
                     ItemStack stack = outputs.get(i);
                     if (stack != null && !stack.isEmpty()) {
-                        context.drawItem(stack, slotX + 1, startY + 1);
+                        drawStack(context, stack, slotX + 1, startY + 1);
                         activeSlots.add(new RenderedSlot(stack, slotX, startY, 18));
                     }
                 }
@@ -1187,17 +1363,70 @@ public class CeiItemInfoScreen extends Screen {
         context.drawBorder(x, y, 18, 18, 0x33FFFFFF);
     }
 
+
+    // ------------------------------------------------------- brassage
+    /** Cote d'une case, identique partout dans la fiche. */
+    private static final int BREW_SLOT = 18;
+    /** Espace entre la potion de base et le resultat ; la fleche s'y centre. */
+    private static final int BREW_ARROW_GAP = 30;
+    /** Chute de l'ingredient jusqu'a la ligne des potions. */
+    private static final int BREW_DROP = 26;
+    /** Ecart du carburant : assez large pour qu'il ne se lise pas comme une entree. */
+    private static final int BREW_FUEL_GAP = 26;
+    /** Bande reservee a l'en-tete de categorie, au-dessus du contenu. */
+    private static final int BREW_HEADER = 24;
+
+    /**
+     * Fleche verticale, pointe vers le bas.
+     *
+     * L'ancienne etait dessinee a la main dans le bloc du brassage, en deux
+     * appels a fill, et sa "pointe" etait un simple trait horizontal plus large
+     * que la hampe -- ce qui ressemblait a un T, pas a une fleche.
+     */
+    /**
+     * Fleche verticale, pointe vers le bas : le meme profil, pivote.
+     *
+     * La hampe se raccourcit de la hauteur de la pointe, donc la fleche
+     * occupe exactement la hauteur demandee.
+     */
+    private void drawArrowDown(DrawContext context, int cx, int y, int height) {
+        int color = 0x88FFFFFF;
+        int headY = y + Math.max(0, height - ARROW_HEAD.length);
+        context.fill(cx - 1, y, cx + 1, headY, color);
+        for (int i = 0; i < ARROW_HEAD.length; i++) {
+            context.fill(cx - ARROW_HEAD[i], headY + i,
+                         cx + ARROW_HEAD[i], headY + i + 1, color);
+        }
+    }
+
+    /**
+     * Profil de la pointe : demi-hauteurs du talon vers l'extremite.
+     *
+     * Une seule table pour la fleche horizontale et la descendante. Deux
+     * tables, c'est deux fleches qui finissent par ne plus se ressembler.
+     */
+    private static final int[] ARROW_HEAD = {5, 5, 4, 3, 2, 1, 1};
+
+    /**
+     * Fleche horizontale, 18 pixels de large.
+     *
+     * L'ancienne pointe tenait en trois colonnes ecrites a la main, avec un
+     * trou au milieu : un petit tas asymetrique plutot qu'un triangle.
+     *
+     * L'axe est inchange -- la hampe reste sur y + 6 et y + 7 -- parce que
+     * cinq des sept appels compensent ce decalage en passant slotY + 2.
+     */
     private void drawArrow(DrawContext context, int x, int y) {
-        // Render simple elegant horizontal arrow
-        context.fill(x, y + 6, x + 18, y + 8, 0x66FFFFFF);
-        context.fill(x + 14, y + 4, x + 15, y + 10, 0x66FFFFFF);
-        context.fill(x + 16, y + 5, x + 17, y + 9, 0x66FFFFFF);
-        context.fill(x + 17, y + 6, x + 18, y + 8, 0x66FFFFFF);
+        int color = 0x88FFFFFF;
+        int headX = x + 18 - ARROW_HEAD.length;
+        context.fill(x, y + 6, headX, y + 8, color);
+        for (int i = 0; i < ARROW_HEAD.length; i++) {
+            context.fill(headX + i, y + 7 - ARROW_HEAD[i],
+                         headX + i + 1, y + 7 + ARROW_HEAD[i], color);
+        }
     }
 
     private void drawTooltips(DrawContext context, int mouseX, int mouseY) {
-        String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
-        boolean isFr = lang != null && lang.toLowerCase().startsWith("fr");
 
         // 0. Header buttons tooltips
         var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
@@ -1207,8 +1436,8 @@ public class CeiItemInfoScreen extends Screen {
         int pinY = containerY + 5;
         if (mouseX >= pinX && mouseX < pinX + 12 && mouseY >= pinY && mouseY < pinY + 12) {
             String tooltipText = isPinned
-                ? (isFr ? "Désancrer la recette" : "Unpin recipe")
-                : (isFr ? "Ancrer la recette" : "Pin recipe");
+                ? (CeiText.t("cei.pin.unpin"))
+                : (CeiText.t("cei.pin.pin"));
             context.drawTooltip(this.textRenderer, List.of(Text.literal(tooltipText)), mouseX, mouseY);
             return;
         }
@@ -1218,8 +1447,8 @@ public class CeiItemInfoScreen extends Screen {
             int hudY = containerY + 5;
             if (mouseX >= hudX && mouseX < hudX + 12 && mouseY >= hudY && mouseY < hudY + 12) {
                 String tooltipText = card.isShowInHud()
-                    ? (isFr ? "Masquer sur l'écran de jeu" : "Hide on HUD")
-                    : (isFr ? "Afficher sur l'écran de jeu" : "Show on HUD");
+                    ? (CeiText.t("cei.pin.hud_hide"))
+                    : (CeiText.t("cei.pin.hud_show"));
                 context.drawTooltip(this.textRenderer, List.of(Text.literal(tooltipText)), mouseX, mouseY);
                 return;
             }
@@ -1228,7 +1457,7 @@ public class CeiItemInfoScreen extends Screen {
             int opY = containerY + 5;
             if (mouseX >= opX && mouseX < opX + 12 && mouseY >= opY && mouseY < opY + 12) {
                 String tooltipText = String.format("%s : %d%%",
-                    isFr ? "Opacité" : "Opacity",
+                    CeiText.t("cei.pin.opacity"),
                     (int) (card.getOpacity() * 100)
                 );
                 context.drawTooltip(this.textRenderer, List.of(Text.literal(tooltipText)), mouseX, mouseY);
@@ -1244,11 +1473,11 @@ public class CeiItemInfoScreen extends Screen {
 
             if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
                 String tooltipText = switch (tab) {
-                    case DESCRIPTION -> isFr ? "Description & Stats" : "Description & Stats";
-                    case CRAFTING -> isFr ? "Comment Crafter" : "How to Craft";
-                    case USAGES -> isFr ? "Usages (Ingrédient)" : "Usages (Ingredient)";
-                    case LOOT -> isFr ? "Comment l'obtenir (Loot)" : "Obtaining (Loot)";
-                    case WORLD -> isFr ? "Biomes et Structures" : "Biomes and Structures";
+                    case DESCRIPTION -> CeiText.t("cei.tab.description");
+                    case CRAFTING -> CeiText.t("cei.tab.craft");
+                    case USAGES -> CeiText.t("cei.tab.usages");
+                    case LOOT -> CeiText.t("cei.tab.loot");
+                    case WORLD -> CeiText.t("cei.tab.biomes");
                 };
                 context.drawTooltip(this.textRenderer, List.of(Text.literal(tooltipText)), mouseX, mouseY);
                 return;
@@ -1257,19 +1486,19 @@ public class CeiItemInfoScreen extends Screen {
 
         // 2. Tooltips for category tabs
         if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
-            int first = firstVisibleCategory();
-            for (int i = first; i < lastVisibleCategory(); i++) {
+            int first = categoryDrawFrom();
+            for (int i = first; i < categoryDrawTo(); i++) {
                 RecipeCategory cat = categories.get(i);
                 int tabX = containerX - 24;
-                int tabY = categoryTabsTop() + (i - first) * 26;
+                int tabY = categoryTabY(i);
 
-                if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
+                if (categoryTabHit(tabX, tabY, mouseX, mouseY)) {
                     String tooltipText = switch (cat.type) {
-                        case CRAFTING -> isFr ? "Table de Craft" : "Crafting Table";
-                        case SMELTING -> isFr ? "Cuisson & Fourneau" : "Smelting & Furnace";
-                        case BREWING -> isFr ? "Alambic (Potions)" : "Brewing Stand";
-                        case STONECUTTING -> isFr ? "Tailleur de Pierre" : "Stonecutter";
-                        case SMITHING -> isFr ? "Table de Forgeron (Smithing)" : "Smithing Table";
+                        case CRAFTING -> CeiText.t("cei.station.crafting_table");
+                        case SMELTING -> CeiText.t("cei.cat.smelting");
+                        case BREWING -> CeiText.t("cei.cat.brewing");
+                        case STONECUTTING -> CeiText.t("cei.station.stonecutter");
+                        case SMITHING -> CeiText.t("cei.station.smithing_table");
                         case CUSTOM -> {
                             boolean useUsages = (activeMainTab == TabType.USAGES);
                             List<?> list = useUsages ? customUsages : customRecipes;
@@ -1285,9 +1514,9 @@ public class CeiItemInfoScreen extends Screen {
                                 }
                             }
                             if (matchedRecipe != null) {
-                                yield getMachineLabel(matchedRecipe, isFr);
+                                yield getMachineLabel(matchedRecipe);
                             }
-                            yield isFr ? "Machine Spéciale (Mod)" : "Special Machine (Mod)";
+                            yield CeiText.t("cei.cat.custom");
                         }
                     };
                     context.drawTooltip(this.textRenderer, List.of(Text.literal(tooltipText)), mouseX, mouseY);
@@ -1315,8 +1544,8 @@ public class CeiItemInfoScreen extends Screen {
             int plusY = arrowY + 12;
 
             if (mouseX >= plusX && mouseX < plusX + 12 && mouseY >= plusY && mouseY < plusY + 12) {
-                String title = isFr ? "Remplir la Table de Craft (+)" : "Fill Crafting Table (+)";
-                String hint = isFr ? "Shift + Clic : Remplir au maximum" : "Shift + Click: Fill maximum";
+                String title = CeiText.t("cei.craft.fill");
+                String hint = CeiText.t("cei.craft.fill_hint");
                 context.drawTooltip(this.textRenderer, List.of(
                     Text.literal(title).formatted(Formatting.GREEN),
                     Text.literal(hint).formatted(Formatting.GRAY)
@@ -1354,8 +1583,6 @@ public class CeiItemInfoScreen extends Screen {
             return true;
         }
 
-        String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
-        boolean isFr = lang != null && lang.toLowerCase().startsWith("fr");
 
         var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
         var card = manager.getPinnedCard(this.targetStack);
@@ -1479,13 +1706,13 @@ public class CeiItemInfoScreen extends Screen {
 
         // 2. Check category tabs clicks
         if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
-            int first = firstVisibleCategory();
-            for (int i = first; i < lastVisibleCategory(); i++) {
+            int first = categoryDrawFrom();
+            for (int i = first; i < categoryDrawTo(); i++) {
                 RecipeCategory cat = categories.get(i);
                 int tabX = containerX - 24;
-                int tabY = categoryTabsTop() + (i - first) * 26;
+                int tabY = categoryTabY(i);
 
-                if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
+                if (categoryTabHit(tabX, tabY, mouseX, mouseY)) {
                     activeCategory = cat;
                     currentPage = 0;
                     updatePinnedState();
@@ -1555,6 +1782,8 @@ public class CeiItemInfoScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (this.ceiModule != null) this.ceiModule.handleMouseRelease();
+
         var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
         var card = manager.getPinnedCard(this.targetStack);
         if (card != null && card.isDragging()) {
@@ -1608,6 +1837,7 @@ public class CeiItemInfoScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (categoryWheel(mouseX, mouseY, verticalAmount)) return true;
         if (this.ceiModule != null) {
             float animationSlideOffset = this.ceiModule.getPanelRenderer().getAnimationSlideOffset();
             if (this.ceiModule.handleMouseScroll(mouseX, mouseY, verticalAmount, this.width, this.height, this.textRenderer, animationSlideOffset)) {
@@ -1795,6 +2025,119 @@ public class CeiItemInfoScreen extends Screen {
         }
     }
 
+
+    /** Les trois champs d'une recette de forge, dans l'ordre d'affichage. */
+    private static final List<String> SMITHING_FIELDS = List.of("template", "base", "addition");
+
+    /**
+     * Noms de champs qui designent une SORTIE.
+     *
+     * Le repli par type ne doit pas les prendre pour des entrees : une recette
+     * dont le resultat serait un Optional se retrouverait sinon avec sa propre
+     * sortie dessinee dans une case d'entree, et indexee comme telle.
+     */
+    private static final Set<String> OUTPUT_FIELD_NAMES = Set.of(
+            "result", "results", "output", "outputs", "out",
+            "resultitem", "outputitem", "outputstack", "resultstack");
+
+    /**
+     * Les entrees d'une recette de forge.
+     *
+     * getIngredients() est essaye d'abord -- une recette moddee peut tres bien
+     * le redefinir -- et on ne retombe sur la lecture des champs que s'il ne
+     * rend rien, ce qui est le cas de toutes les recettes de forge du jeu.
+     */
+    public static List<ItemStack> smithingInputs(Recipe<?> recipe) {
+        try {
+            List<Ingredient> declared = recipe.getIngredients();
+            if (declared != null && !declared.isEmpty()) {
+                List<ItemStack> out = new ArrayList<>(declared.size());
+                for (Ingredient ing : declared) {
+                    ItemStack[] matching = (ing == null) ? new ItemStack[0] : ing.getMatchingStacks();
+                    out.add(matching.length > 0 ? matching[0] : ItemStack.EMPTY);
+                }
+                return out;
+            }
+        } catch (Exception | LinkageError e) {
+            // une recette moddee peut lever ici : on passe a la lecture des champs
+        }
+        return ingredientFields(recipe);
+    }
+
+    /**
+     * Les champs d'entree d'une recette, lus par TYPE et non par nom.
+     *
+     * Les trois noms connus d'une recette de forge sont essayes en premier,
+     * dans l'ordre ou le jeu les affiche. A defaut on prend les champs de type
+     * Ingredient dans leur ordre de declaration, ce qui rattrape les recettes
+     * moddees qui nomment leurs champs autrement.
+     *
+     * Reserve honnete : l'ordre rendu par getDeclaredFields() n'est garanti
+     * par aucune specification. En pratique la JVM rend l'ordre de
+     * declaration -- et c'est precisement pour ne pas en dependre sur le cas
+     * qui compte que les trois noms connus passent avant.
+     */
+    public static List<ItemStack> ingredientFields(Recipe<?> recipe) {
+        List<ItemStack> out = new ArrayList<>();
+        Class<?> clazz = recipe.getClass();
+
+        for (String name : SMITHING_FIELDS) {
+            ItemStack found = firstStackOfField(recipe, clazz, name);
+            if (found != null) out.add(found);
+        }
+        if (out.size() == SMITHING_FIELDS.size()) return out;
+        out.clear();
+
+        for (Class<?> c = clazz; c != null && c != Object.class; c = c.getSuperclass()) {
+            for (Field field : c.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+                if (OUTPUT_FIELD_NAMES.contains(
+                        field.getName().toLowerCase(java.util.Locale.ROOT))) continue;
+                if (!isIngredientType(field.getType())) continue;
+                try {
+                    field.setAccessible(true);
+                    List<ItemStack> one = new ArrayList<>();
+                    unpackInputObject(field.get(recipe), one);
+                    out.add(one.isEmpty() ? ItemStack.EMPTY : one.get(0));
+                } catch (Exception | LinkageError e) {
+                    out.add(ItemStack.EMPTY);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static boolean isIngredientType(Class<?> type) {
+        if (Ingredient.class.isAssignableFrom(type)) return true;
+        if (type.isArray()) return isIngredientType(type.getComponentType());
+        // Optional<Ingredient> depuis 1.21.2. Le nom du champ a deja ecarte les
+        // sorties, et unpackInputObject ne rend que des piles.
+        return type == java.util.Optional.class;
+    }
+
+    /**
+     * La premiere pile d'un champ donne, cherche en remontant la hierarchie.
+     *
+     * Rend null si le champ n'existe nulle part -- ce que l'appelant distingue
+     * d'une pile vide, qui elle veut dire "champ present mais sans contenu".
+     */
+    private static ItemStack firstStackOfField(Object owner, Class<?> clazz, String name) {
+        for (Class<?> c = clazz; c != null && c != Object.class; c = c.getSuperclass()) {
+            try {
+                Field field = c.getDeclaredField(name);
+                field.setAccessible(true);
+                List<ItemStack> one = new ArrayList<>();
+                unpackInputObject(field.get(owner), one);
+                return one.isEmpty() ? ItemStack.EMPTY : one.get(0);
+            } catch (NoSuchFieldException e) {
+                // absent a ce niveau : on remonte
+            } catch (Exception | LinkageError e) {
+                return ItemStack.EMPTY;
+            }
+        }
+        return null;
+    }
+
     public static List<ItemStack> extractCustomInputs(Recipe<?> recipe) {
         List<ItemStack> list = new ArrayList<>();
 
@@ -1847,6 +2190,16 @@ public class CeiItemInfoScreen extends Screen {
                     unpackInputObject(val, list);
                 }
             } catch (Exception e) {}
+        }
+
+        // 3. Dernier recours : les champs de type Ingredient.
+        //
+        // Les deux voies ci-dessus cherchent par NOM, dans une liste fermee qui
+        // ne contient ni template, ni base, ni addition. Sans ce filet, aucune
+        // recette de forge n'entre dans l'index par entrees -- et l'onglet
+        // Usages n'en montre pour aucun item.
+        if (list.isEmpty()) {
+            list.addAll(ingredientFields(recipe));
         }
 
         // Remove empty stacks and duplicates
@@ -1980,8 +2333,8 @@ public class CeiItemInfoScreen extends Screen {
      * moddees. On passe ici par CeiRecipeStation, qui derive un nom du type de
      * recette (create:crushing -> "Crushing Wheel", a defaut "Crushing").
      */
-    private String getMachineLabel(Recipe<?> recipe, boolean isFr) {
-        if (recipe == null) return isFr ? "Machine Spéciale" : "Custom Machine";
+    private String getMachineLabel(Recipe<?> recipe) {
+        if (recipe == null) return CeiText.t("cei.station.custom");
         ItemStack icon = getMachineIcon(recipe);
         if (icon != null && !icon.isEmpty() && icon.getItem() != Items.DISPENSER) {
             String name = icon.getName().getString();
@@ -1993,7 +2346,7 @@ public class CeiItemInfoScreen extends Screen {
         } catch (Exception e) {
             // type non enregistre : on laisse CeiRecipeStation gerer le null
         }
-        return com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation.labelFor(typeId, isFr);
+        return com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation.labelFor(typeId);
     }
 
     /**
@@ -2090,18 +2443,6 @@ public class CeiItemInfoScreen extends Screen {
                 }
             }
 
-            // 1. Try our smart class name and ID mapping helper first!
-            if (typePath != null) {
-                ItemStack match = findMachineItem(typePath, namespace);
-                if (match != null) return match;
-            }
-            if (serPath != null) {
-                ItemStack match = findMachineItem(serPath, namespace);
-                if (match != null) return match;
-            }
-            ItemStack classMatch = findMachineItem(className, namespace);
-            if (classMatch != null) return classMatch;
-
             // 2. Direct lookup fallbacks using solved namespace and path
             if (typePath != null && namespace != null) {
                 Item item = Registries.ITEM.get(Identifier.of(namespace, typePath));
@@ -2155,6 +2496,22 @@ public class CeiItemInfoScreen extends Screen {
             ItemStack station = com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation
                     .iconFor(Registries.RECIPE_TYPE.getId(recipe.getType()));
             if (!station.isEmpty()) return station;
+
+            // La table de mots-cles, DERNIER recours avant la recherche floue.
+            // Elle raisonne par sous-chaine : "industrial_grinder" contient
+            // "grinder", donc elle ramenait le broyeur industriel sur l'item du
+            // broyeur simple. Elle ne doit intervenir que si l'identifiant n'a
+            // rien donne.
+            if (typePath != null) {
+                ItemStack match = findMachineItem(typePath, namespace);
+                if (match != null) return match;
+            }
+            if (serPath != null) {
+                ItemStack match = findMachineItem(serPath, namespace);
+                if (match != null) return match;
+            }
+            ItemStack classMatch = findMachineItem(className, namespace);
+            if (classMatch != null) return classMatch;
 
             // 3. Fuzzy search in same namespace
             if (namespace != null) {

@@ -1,5 +1,6 @@
 package com.ceketrum.cei.gui.module.cei.recipe.view;
 
+import com.ceketrum.cei.i18n.CeiText;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.registry.Registries;
@@ -109,7 +110,11 @@ public final class CeiRecipeAdapter {
 
     private static List<ItemStack> dedupe(List<ItemStack> stacks, int max) {
         List<ItemStack> out = new ArrayList<>();
-        java.util.Set<net.minecraft.item.Item> seen = new java.util.LinkedHashSet<>();
+        // Set<Object> et non Set<Item> : cet ensemble ne sert qu'a repérer
+        // les doublons. Nommer le type obligerait a l'adapter a chaque jeu de
+        // mappings (net.minecraft.item.Item en Yarn,
+        // net.minecraft.world.item.Item chez Mojang) sans rien apporter.
+        java.util.Set<Object> seen = new java.util.LinkedHashSet<>();
         for (ItemStack s : stacks) {
             if (s == null || s.isEmpty()) continue;
             if (!seen.add(s.getItem())) continue;
@@ -262,7 +267,7 @@ public final class CeiRecipeAdapter {
 
     private static Text titleOf(Recipe<?> recipe) {
         Identifier typeId = typeIdOf(recipe);
-        if (typeId == null) return Text.literal("Recette");
-        return Text.literal(CeiRecipeStation.labelFor(typeId, false));
+        if (typeId == null) return Text.literal(CeiText.t("cei.recipe.generic"));
+        return Text.literal(CeiRecipeStation.labelFor(typeId));
     }
 }

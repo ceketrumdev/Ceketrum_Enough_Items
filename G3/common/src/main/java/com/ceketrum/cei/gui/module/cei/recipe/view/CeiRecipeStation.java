@@ -1,5 +1,6 @@
 package com.ceketrum.cei.gui.module.cei.recipe.view;
 
+import com.ceketrum.cei.i18n.CeiText;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -63,12 +64,35 @@ public final class CeiRecipeStation {
         return found.copy();
     }
 
+    /**
+     * Les libelles memorises sont TRADUITS : ils viennent du nom affiche de
+     * l'icone, ou d'une cle de langue du mod fournisseur. Ils ne valent donc
+     * que pour la langue active, et changer de langue en jeu laissait tous
+     * les onglets dans l'ancienne -- le cache n'etait vide qu'au changement
+     * de monde.
+     *
+     * Les icones, elles, ne dependent pas de la langue : ICONS survit.
+     */
+    private static String labelLanguage = null;
+
+    private static void dropLabelsIfLanguageChanged() {
+        // "language.code" est fourni par les fichiers de langue du jeu lui-meme
+        // et vaut "en_us", "fr_fr"... Il change exactement quand le joueur
+        // change de langue, ce qu'aucun champ de ce fichier ne sait voir.
+        String lang = CeiText.t("language.code");
+        if (labelLanguage == null || !labelLanguage.equals(lang)) {
+            labelLanguage = lang;
+            LABELS.clear();
+        }
+    }
+
     /** Libelle de la categorie. Ne renvoie jamais null ni chaine vide. */
-    public static synchronized String labelFor(ResourceLocation typeId, boolean isFr) {
-        if (typeId == null) return isFr ? "Machine Speciale" : "Custom Machine";
+    public static synchronized String labelFor(ResourceLocation typeId) {
+        dropLabelsIfLanguageChanged();
+        if (typeId == null) return CeiText.t("cei.station.custom");
         String cached = LABELS.get(typeId);
         if (cached != null) return cached;
-        String label = resolveLabel(typeId, isFr);
+        String label = resolveLabel(typeId);
         LABELS.put(typeId, label);
         return label;
     }
@@ -145,11 +169,11 @@ public final class CeiRecipeStation {
 
     // ----------------------------------------------------------------- libelle
 
-    private static String resolveLabel(ResourceLocation typeId, boolean isFr) {
+    private static String resolveLabel(ResourceLocation typeId) {
         ItemStack icon = iconFor(typeId);
         if (!icon.isEmpty()) {
             String name = icon.getHoverName().getString();
-            if (name != null && !name.isBlank()) return name;
+            if (name != null && !name.isBlank()) return name + variantSuffix(typeId, icon);
         }
 
         String ns   = typeId.getNamespace();
@@ -199,6 +223,43 @@ public final class CeiRecipeStation {
             }
         }
         return s;
+    }
+
+
+    /**
+     * Ce qui distingue ce type de recette de la machine qui lui sert d'icone.
+     *
+     * Plusieurs types tournent souvent dans la meme machine -- chez Thermal,
+     * "pulverizer" et "pulverizer_catalyst". Comme le libelle est tire du nom
+     * de l'icone, ces types se retrouvaient avec le MEME nom : deux onglets
+     * identiques, indiscernables meme au survol. On raccroche donc au libelle
+     * la partie du chemin qui les separe.
+     *
+     * Le prolongement n'est teste que dans un sens : le chemin du type doit
+     * prolonger celui de l'icone. Chez Create, "crushing" trouve son icone
+     * dans "crushing_wheel" -- c'est l'icone qui prolonge le type, il n'y a
+     * rien a preciser, et la condition inverse aurait colle un suffixe absurde
+     * a une categorie pourtant unique.
+     */
+    private static String variantSuffix(ResourceLocation typeId, ItemStack icon) {
+        try {
+            ResourceLocation iconId = BuiltInRegistries.ITEM.getKey(icon.getItem());
+            if (iconId == null) return "";
+            String iconPath = iconId.getPath();
+            String typePath = typeId.getPath();
+            if (iconPath.isEmpty() || typePath.equals(iconPath)) return "";
+
+            String extra = null;
+            if (typePath.startsWith(iconPath + "_")) {
+                extra = typePath.substring(iconPath.length() + 1);
+            } else if (typePath.endsWith("_" + iconPath)) {
+                extra = typePath.substring(0, typePath.length() - iconPath.length() - 1);
+            }
+            if (extra == null || extra.isEmpty()) return "";
+            return " (" + prettify(extra) + ")";
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private static String prettify(String path) {

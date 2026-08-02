@@ -1,5 +1,6 @@
 package com.ceketrum.cei.data;
 
+import com.ceketrum.cei.i18n.CeiText;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,8 +91,6 @@ public class BlockGenerationManager {
             blockBiomesCache.clear();
             blockHeightsCache.clear();
             
-            String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
-            boolean isFr = lang != null && lang.toLowerCase().startsWith("fr");
             
             int scannedBiomes = 0;
             
@@ -100,7 +99,7 @@ public class BlockGenerationManager {
                 var biome = biomeRegistry.get(key).map(net.minecraft.core.Holder::value).orElse(null);
                 if (biome == null) continue;
                 Identifier biomeId = key.identifier();
-                String biomeName = formatBiomeName(biomeId, isFr);
+                String biomeName = biomeId.getPath();   // brut : traduit a l'affichage
                 scannedBiomes++;
                 
                 // Récupérer les paramètres de génération du biome
@@ -117,7 +116,7 @@ public class BlockGenerationManager {
                             for (var placedFeatureEntry : placedFeatureList) {
                                 PlacedFeature placedFeature = placedFeatureEntry.value();
                                 if (placedFeature != null) {
-                                    scanPlacedFeature(placedFeature, biomeName, isFr);
+                                    scanPlacedFeature(placedFeature, biomeName);
                                 }
                             }
                         }
@@ -134,7 +133,7 @@ public class BlockGenerationManager {
         }
     }
     
-    private void scanPlacedFeature(PlacedFeature feature, String biomeName, boolean isFr) {
+    private void scanPlacedFeature(PlacedFeature feature, String biomeName) {
         try {
             // 1. Extraire la configuration configurée
             var configuredEntry = feature.feature();
@@ -148,7 +147,7 @@ public class BlockGenerationManager {
             String heightDetails = null;
             for (PlacementModifier modifier : feature.placement()) {
                 if (modifier instanceof HeightRangePlacement heightModifier) {
-                    heightDetails = formatHeightModifier(heightModifier, isFr);
+                    heightDetails = formatHeightModifier(heightModifier);
                     break;
                 }
             }
@@ -230,57 +229,28 @@ public class BlockGenerationManager {
         }
     }
     
-    private String formatHeightModifier(HeightRangePlacement modifier, boolean isFr) {
+    private String formatHeightModifier(HeightRangePlacement modifier) {
         try {
             Field heightProviderField = modifier.getClass().getDeclaredField("height");
             heightProviderField.setAccessible(true);
             HeightProvider heightProvider = (HeightProvider) heightProviderField.get(modifier);
             if (heightProvider != null) {
                 String desc = heightProvider.toString(); // Souvent formaté de type Uniform / Trapezoid
-                return isFr ? "Altitudes Y : " + desc : "Y Levels: " + desc;
+                return desc;   // prefixe ajoute a l'affichage, pas au scan
             }
         } catch (Exception e) {}
         return null;
     }
     
-    private String formatBiomeName(Identifier id, boolean isFr) {
-        String path = id.getPath();
+    private String formatBiomeName(String path) {
         String name = path.replace("_", " ");
         if (!name.isEmpty()) {
             name = Character.toUpperCase(name.charAt(0)) + name.substring(1);
         }
         
-        if (isFr) {
-            // Localisation soignée en français des biomes vanilla courants
-            return switch (path) {
-                case "plains" -> "Plaines";
-                case "desert" -> "Désert";
-                case "forest" -> "Forêt";
-                case "taiga" -> "Taïga";
-                case "swamp" -> "Marais";
-                case "river" -> "Rivière";
-                case "ocean" -> "Océan";
-                case "beach" -> "Plage";
-                case "savanna" -> "Savane";
-                case "badlands" -> "Badlands (Terres arides)";
-                case "snowy_slopes" -> "Pentes enneigées";
-                case "meadow" -> "Prairie";
-                case "grove" -> "Bosquet";
-                case "cherry_grove" -> "Forêt de Cerisiers";
-                case "deep_dark" -> "Abîmes obscures (Deep Dark)";
-                case "mangrove_swamp" -> "Marais à Mangroves";
-                case "lush_caves" -> "Grottes luxuriantes";
-                case "dripstone_caves" -> "Grottes de spéléothèmes";
-                case "basalt_deltas" -> "Deltas de Basalte";
-                case "crimson_forest" -> "Forêt carmin";
-                case "warped_forest" -> "Forêt distordue";
-                case "soul_sand_valley" -> "Vallée des Âmes";
-                case "nether_wastes" -> "Désolations du Nether";
-                case "the_end" -> "L'End";
-                default -> name;
-            };
-        }
-        return name;
+        // Une cle par biome, avec repli sur le chemin embelli : un biome
+        // de mod suit exactement le meme chemin qu'un biome vanilla.
+        return CeiText.or("cei.biome." + path, name);
     }
     
     /**
@@ -289,41 +259,39 @@ public class BlockGenerationManager {
     public List<String> getBlockGenerationSources(Item item) {
         ensureCacheBuilt();
         
-        String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
-        boolean isFr = lang != null && lang.toLowerCase().startsWith("fr");
         
         List<String> results = new ArrayList<>();
         
         // 1. Essayer de récupérer le scan dynamique
         Set<String> scannedBiomes = blockBiomesCache.get(item);
         if (scannedBiomes != null && !scannedBiomes.isEmpty()) {
-            String title = isFr ? "Génération Biomes (" + scannedBiomes.size() + ") :" : "Biome Generation (" + scannedBiomes.size() + "):";
+            String title = CeiText.t("cei.gen.biomes.title", scannedBiomes.size());
             results.add(title);
             
             // Limiter à 5 biomes visibles et ajouter un "... et X autres"
             List<String> list = new ArrayList<>(scannedBiomes);
             int limit = Math.min(5, list.size());
             for (int i = 0; i < limit; i++) {
-                results.add("  • " + list.get(i));
+                results.add("  • " + formatBiomeName(list.get(i)));
             }
             if (list.size() > 5) {
-                results.add(isFr ? "  • ... et " + (list.size() - 5) + " autres biomes" : "  • ... and " + (list.size() - 5) + " other biomes");
+                results.add("  • ... et " + CeiText.t("cei.gen.more", list.size() - 5));
             }
             
             String height = blockHeightsCache.get(item);
             if (height != null) {
-                results.add("  • " + height);
+                results.add("  • " + CeiText.t("cei.gen.ylevels", height));
             }
         }
         
         // 2. Récupérer les fallbacks locaux (biomes, structures, altitudes)
-        List<String> fallbacks = getFallbackBlockLocations(item, isFr);
+        List<String> fallbacks = getFallbackBlockLocations(item);
         results.addAll(fallbacks);
         
         return results;
     }
     
-    private List<String> getFallbackBlockLocations(Item item, boolean isFr) {
+    private List<String> getFallbackBlockLocations(Item item) {
         Identifier id = BuiltInRegistries.ITEM.getKey(item);
         if (id == null) return Collections.emptyList();
         String path = id.getPath();
@@ -334,52 +302,52 @@ public class BlockGenerationManager {
             // Minerais Vanilla
             case "coal_ore":
             case "deepslate_coal_ore":
-                locs.add(isFr ? "Génération : Tous les biomes montagneux et souterrains" : "Generation: All mountainous and underground biomes");
-                locs.add(isFr ? "Altitudes Y : Y=0 à Y=256 (Pic à Y=96 et Y=256)" : "Y Levels: Y=0 to Y=256 (Peaks at Y=96 and Y=256)");
+                locs.add(CeiText.t("cei.gen.all_mountain_underground"));
+                locs.add(CeiText.t("cei.gen.y_0_256_peaks_96_256"));
                 break;
             case "iron_ore":
             case "deepslate_iron_ore":
-                locs.add(isFr ? "Génération : Tous les biomes (Particulièrement les Montagnes et Grottes)" : "Generation: All biomes (Especially Mountains and Caves)");
-                locs.add(isFr ? "Altitudes Y : Y=-64 à Y=320 (Pics à Y=16 et Y=256)" : "Y Levels: Y=-64 to Y=320 (Peaks at Y=16 and Y=256)");
+                locs.add(CeiText.t("cei.gen.all_biomes_mountains_caves"));
+                locs.add(CeiText.t("cei.gen.y_m64_320_peaks_16_256"));
                 break;
             case "copper_ore":
             case "deepslate_copper_ore":
-                locs.add(isFr ? "Génération : Tous les biomes (Abondant dans les grottes de spéléothèmes)" : "Generation: All biomes (Very abundant in Dripstone Caves)");
-                locs.add(isFr ? "Altitudes Y : Y=-16 à Y=112 (Pic à Y=48)" : "Y Levels: Y=-16 to Y=112 (Peak at Y=48)");
+                locs.add(CeiText.t("cei.gen.all_biomes_dripstone"));
+                locs.add(CeiText.t("cei.gen.y_m16_112_peak_48"));
                 break;
             case "gold_ore":
             case "deepslate_gold_ore":
-                locs.add(isFr ? "Génération : Badlands (Terres arides) et tous les souterrains" : "Generation: Badlands and all deep undergrounds");
-                locs.add(isFr ? "Badlands : Y=32 à Y=256 / Souterrain : Y=-64 à Y=32" : "Badlands: Y=32 to Y=256 / Underground: Y=-64 to Y=32");
+                locs.add(CeiText.t("cei.gen.badlands_and_underground"));
+                locs.add(CeiText.t("cei.gen.y_badlands_underground"));
                 break;
             case "redstone_ore":
             case "deepslate_redstone_ore":
-                locs.add(isFr ? "Génération : Très profond sous terre (Tous les biomes)" : "Generation: Deep underground in all biomes");
-                locs.add(isFr ? "Altitudes Y : Y=-64 à Y=16 (Abondance accrue vers Y=-64)" : "Y Levels: Y=-64 to Y=16 (Increasingly common towards Y=-64)");
+                locs.add(CeiText.t("cei.gen.very_deep_all_biomes"));
+                locs.add(CeiText.t("cei.gen.y_m64_16_toward_m64"));
                 break;
             case "lapis_ore":
             case "deepslate_lapis_ore":
-                locs.add(isFr ? "Génération : Profond sous terre (Tous les biomes)" : "Generation: Deep underground in all biomes");
-                locs.add(isFr ? "Altitudes Y : Y=-64 à Y=64 (Pic à Y=0)" : "Y Levels: Y=-64 to Y=64 (Peak at Y=0)");
+                locs.add(CeiText.t("cei.gen.deep_all_biomes"));
+                locs.add(CeiText.t("cei.gen.y_m64_64_peak_0"));
                 break;
             case "diamond_ore":
             case "deepslate_diamond_ore":
-                locs.add(isFr ? "Génération : Profondeurs extrêmes des Abysses (Deepslate Y < 0)" : "Generation: Extreme depths of the Deepslate (Y < 0)");
-                locs.add(isFr ? "Altitudes Y : Y=-64 à Y=16 (Abondance maximale à Y=-64)" : "Y Levels: Y=-64 to Y=16 (Max abundance at Y=-64)");
+                locs.add(CeiText.t("cei.gen.extreme_deepslate"));
+                locs.add(CeiText.t("cei.gen.y_m64_16_max_m64"));
                 break;
             case "emerald_ore":
             case "deepslate_emerald_ore":
-                locs.add(isFr ? "Génération : Uniquement sous les biomes de Montagne (Windswept / Peaks)" : "Generation: Only under Mountain biomes (Windswept / Peaks)");
-                locs.add(isFr ? "Altitudes Y : Y=-16 à Y=320 (Pic à Y=256)" : "Y Levels: Y=-16 to Y=320 (Peak at Y=256)");
+                locs.add(CeiText.t("cei.gen.only_under_mountains"));
+                locs.add(CeiText.t("cei.gen.y_m16_320_peak_256"));
                 break;
             case "nether_quartz_ore":
             case "nether_gold_ore":
-                locs.add(isFr ? "Génération : Naturellement partout dans le Nether" : "Generation: Naturally everywhere in the Nether");
-                locs.add(isFr ? "Altitudes Y : Y=10 à Y=117" : "Y Levels: Y=10 to Y=117");
+                locs.add(CeiText.t("cei.gen.nether_everywhere"));
+                locs.add(CeiText.t("cei.gen.y_10_117"));
                 break;
             case "ancient_debris":
-                locs.add(isFr ? "Génération : Sous-sol très profond du Nether (Masqué sous la lave)" : "Generation: Deep underground in the Nether (Hidden under lava)");
-                locs.add(isFr ? "Altitudes Y : Y=8 à Y=119 (Pic absolu à Y=15)" : "Y Levels: Y=8 to Y=119 (Absolute peak at Y=15)");
+                locs.add(CeiText.t("cei.gen.nether_deep_under_lava"));
+                locs.add(CeiText.t("cei.gen.y_8_119_peak_15"));
                 break;
                 
             // Blocs de Structures & Trial Chambers
@@ -387,71 +355,71 @@ public class BlockGenerationManager {
             case "tuff_bricks":
             case "chiseled_tuff":
             case "polished_tuff":
-                locs.add(isFr ? "Structure : Chambres des Épreuves (Trial Chambers)" : "Structure: Trial Chambers");
-                locs.add(isFr ? "Génération : Abysses souterraines abyssales (Y < 0)" : "Generation: Deepslate underground (Y < 0)");
+                locs.add(CeiText.t("cei.gen.struct_trial_chambers"));
+                locs.add(CeiText.t("cei.gen.deepslate_underground"));
                 break;
             case "copper_bulb":
             case "chiseled_copper":
             case "copper_grate":
             case "waxed_copper_bulb":
-                locs.add(isFr ? "Structure : Chambres des Épreuves (Éléments d'éclairage et murs)" : "Structure: Trial Chambers (Lighting and structural blocks)");
+                locs.add(CeiText.t("cei.gen.struct_trial_lighting"));
                 break;
             case "nether_bricks":
             case "nether_brick_fence":
-                locs.add(isFr ? "Structure : Forteresses du Nether" : "Structure: Nether Fortresses");
+                locs.add(CeiText.t("cei.gen.struct_nether_fortress"));
                 break;
             case "red_nether_bricks":
-                locs.add(isFr ? "Génération : Forêt Carmin (Ruines / Nether)" : "Generation: Crimson Forest (Nether)");
+                locs.add(CeiText.t("cei.gen.crimson_forest"));
                 break;
             case "basalt":
             case "polished_basalt":
-                locs.add(isFr ? "Biome : Deltas de Basalte (Colonnes volcaniques massives)" : "Biome: Basalt Deltas (Massive volcanic columns)");
+                locs.add(CeiText.t("cei.gen.basalt_deltas"));
                 break;
             case "blackstone":
             case "polished_blackstone":
             case "gilded_blackstone":
-                locs.add(isFr ? "Biome : Vallée des Âmes, Vestiges de Bastion (Nether)" : "Biome: Soul Sand Valley, Bastion Remnants (Nether)");
+                locs.add(CeiText.t("cei.gen.soul_valley_bastion"));
                 break;
             case "soul_sand":
             case "soul_soil":
-                locs.add(isFr ? "Biome : Vallée des Âmes (Soul Sand Valley - Nether)" : "Biome: Soul Sand Valley (Nether)");
+                locs.add(CeiText.t("cei.gen.soul_sand_valley"));
                 break;
             case "glowstone":
-                locs.add(isFr ? "Nether : Pousse sous le plafond rocheux de toutes les zones" : "Nether: Grows under the ceiling of all Nether biomes");
+                locs.add(CeiText.t("cei.gen.nether_ceiling"));
                 break;
             case "end_stone":
-                locs.add(isFr ? "Dimension : L'End (Constitue l'intégralité des îles)" : "Dimension: The End (Constitutes all islands)");
+                locs.add(CeiText.t("cei.gen.the_end_islands"));
                 break;
             case "purpur_block":
             case "purpur_pillar":
-                locs.add(isFr ? "Structure : Cités de l'End (Tours et ponts)" : "Structure: End Cities (Towers and bridges)");
+                locs.add(CeiText.t("cei.gen.struct_end_cities"));
                 break;
             case "prismarine":
             case "dark_prismarine":
             case "prismarine_bricks":
-                locs.add(isFr ? "Structure : Monuments Océaniques (Ocean Monument)" : "Structure: Ocean Monuments");
+                locs.add(CeiText.t("cei.gen.struct_ocean_monument"));
                 break;
             case "sea_lantern":
-                locs.add(isFr ? "Structure : Monuments Océaniques (Éléments lumineux)" : "Structure: Ocean Monuments (Light sources)");
+                locs.add(CeiText.t("cei.gen.struct_monument_light"));
                 break;
             case "sponge":
             case "wet_sponge":
-                locs.add(isFr ? "Structure : Monuments Océaniques (Salles d'éponges secrètes)" : "Structure: Ocean Monuments (Secret sponge rooms)");
+                locs.add(CeiText.t("cei.gen.struct_monument_sponge"));
                 break;
             case "moss_block":
             case "spore_blossom":
             case "cave_vines":
-                locs.add(isFr ? "Biome : Grottes Luxuriantes (Lush Caves)" : "Biome: Lush Caves");
+                locs.add(CeiText.t("cei.gen.lush_caves"));
                 break;
             case "dripstone_block":
             case "pointed_dripstone":
-                locs.add(isFr ? "Biome : Grottes de spéléothèmes (Dripstone Caves)" : "Biome: Dripstone Caves");
+                locs.add(CeiText.t("cei.gen.dripstone_caves"));
                 break;
             case "sculk":
             case "sculk_catalyst":
             case "sculk_shrieker":
             case "sculk_sensor":
-                locs.add(isFr ? "Biome : Cités Abyssales (Ancient Cities / Deep Dark)" : "Biome: Ancient Cities (Deep Dark / Ancient City)");
+                locs.add(CeiText.t("cei.gen.ancient_cities"));
                 break;
             case "terracotta":
             case "red_terracotta":
@@ -460,19 +428,19 @@ public class BlockGenerationManager {
             case "white_terracotta":
             case "light_gray_terracotta":
             case "brown_terracotta":
-                locs.add(isFr ? "Biome : Badlands (Terres arides - Stries géologiques colorées)" : "Biome: Badlands (Colorful geologic clay layers)");
+                locs.add(CeiText.t("cei.gen.badlands_clay"));
                 break;
             case "mud":
             case "mangrove_roots":
-                locs.add(isFr ? "Biome : Marais à Mangroves (Mangrove Swamp)" : "Biome: Mangrove Swamp");
+                locs.add(CeiText.t("cei.gen.mangrove_swamp"));
                 break;
             case "sandstone":
             case "chiseled_sandstone":
             case "smooth_sandstone":
-                locs.add(isFr ? "Génération : Sous-couche des déserts, Temples du désert" : "Generation: Sub-surface of Desert biomes, Desert Temples");
+                locs.add(CeiText.t("cei.gen.desert_subsurface"));
                 break;
             case "red_sandstone":
-                locs.add(isFr ? "Génération : Sous-couche des Badlands" : "Generation: Sub-surface of Badlands");
+                locs.add(CeiText.t("cei.gen.badlands_subsurface"));
                 break;
         }
         

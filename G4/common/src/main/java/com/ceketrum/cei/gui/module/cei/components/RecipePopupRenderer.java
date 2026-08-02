@@ -298,8 +298,6 @@ public class RecipePopupRenderer {
                 currentY += 2;
             }
 
-            String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
-            boolean isFr = lang != null && lang.toLowerCase().startsWith("fr");
 
             // Labels
             String durabilityLabel = CeiText.t("cei.stat.durability");

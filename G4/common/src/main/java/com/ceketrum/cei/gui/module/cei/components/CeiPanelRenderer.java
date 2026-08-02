@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
  * Gère le rendu du fond du panneau CEI avec la barre de recherche.
  */
 public class CeiPanelRenderer {
+    private final CeiFilterPanel filterPanel = new CeiFilterPanel();
     private final SearchBar searchBar = new SearchBar();
     private boolean showFavoritesOnly = false;
     private long panelOpenTime = System.currentTimeMillis();
@@ -260,8 +261,11 @@ public class CeiPanelRenderer {
         int textWidth = textRenderer.width(Component.literal(favoritesButtonText).withStyle(ChatFormatting.BOLD));
         // Largeur du bouton = texte + padding, avec une marge minimale de 5px de chaque côté du panneau
         int maxButtonWidth = ceiWidth - 10; // 5px de marge de chaque côté
-        int favoritesButtonWidth = Math.min(textWidth + padding, maxButtonWidth);
-        int favoritesButtonX = ceiX + (ceiWidth - favoritesButtonWidth) / 2;
+        // Deux boutons cote a cote : Favoris a gauche, Filtres a droite.
+        // La largeur est partagee au lieu d'etre ajustee au texte, sinon le
+        // second bouton n'aurait nulle part ou aller.
+        int favoritesButtonWidth = (ceiWidth - 10 - 4) / 2;
+        int favoritesButtonX = ceiX + 5;
 
         // Fond du bouton
         int buttonBgColor = 0xFF2C2C2C;
@@ -276,6 +280,14 @@ public class CeiPanelRenderer {
         int buttonTextColor = titleColor;
         context.drawString(textRenderer, Component.literal(favoritesButtonText).withStyle(ChatFormatting.BOLD),
                         textX, textY, buttonTextColor, false);
+
+        filterPanel.render(context, favoritesButtonX + favoritesButtonWidth + 4,
+                favoritesButtonY, favoritesButtonWidth, ceiX, ceiWidth,
+                textRenderer, mouseX, mouseY);
+    }
+
+    public CeiFilterPanel getFilterPanel() {
+        return filterPanel;
     }
 
     /**
@@ -367,7 +379,13 @@ public class CeiPanelRenderer {
         int separatorY = searchBarY + 14 + 3; // 14 = hauteur de la barre de recherche
         int favoritesButtonY = separatorY + 3;
         int favoritesButtonHeight = 16;
-        return favoritesButtonY + favoritesButtonHeight + 3; // +3 pour un petit espace après le bouton
+        // Le panneau deroule POUSSE la liste au lieu de la recouvrir :
+        // un seul endroit decide ou la liste commence, et le defilement
+        // existant continue de s'appliquer tel quel.
+        // Le deroulant RECOUVRE la liste : elle ne bouge pas quand il
+        // s'ouvre. Le sursaut de tout l'inventaire etait pire que le
+        // recouvrement.
+        return favoritesButtonY + favoritesButtonHeight + 3;
     }
 
     /**
@@ -411,8 +429,11 @@ public class CeiPanelRenderer {
         // Mesurer le texte avec le formatage BOLD
         int textWidth = textRenderer.width(Component.literal(favoritesButtonText).withStyle(ChatFormatting.BOLD));
         int maxButtonWidth = ceiWidth - 10;
-        int favoritesButtonWidth = Math.min(textWidth + padding, maxButtonWidth);
-        int favoritesButtonX = ceiX + (ceiWidth - favoritesButtonWidth) / 2;
+        // Deux boutons cote a cote : Favoris a gauche, Filtres a droite.
+        // La largeur est partagee au lieu d'etre ajustee au texte, sinon le
+        // second bouton n'aurait nulle part ou aller.
+        int favoritesButtonWidth = (ceiWidth - 10 - 4) / 2;
+        int favoritesButtonX = ceiX + 5;
 
         return GuiRenderHelper.isMouseOver(mouseX, mouseY, favoritesButtonX, favoritesButtonY,
                                           favoritesButtonWidth, favoritesButtonHeight);

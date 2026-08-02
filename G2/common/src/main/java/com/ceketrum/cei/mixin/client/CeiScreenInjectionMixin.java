@@ -168,6 +168,14 @@ public abstract class CeiScreenInjectionMixin extends Screen {
         cancellable = true
     )
     private void cei$mouseReleased(double mouseX, double mouseY, int button, CallbackInfoReturnable<Boolean> cir) {
+        // Fin d'un eventuel glisser d'ascenseur. Appel sans
+        // argument : la signature de cette methode change selon
+        // la version, son contenu ne nous sert pas.
+        if (cei$isValidScreen()) {
+            CeiScreenHelper.getOrCreateModule((Screen)(Object)this)
+                    .handleMouseRelease();
+        }
+
         if (!cei$isValidScreen()) {
             return;
         }

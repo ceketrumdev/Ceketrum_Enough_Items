@@ -1,5 +1,6 @@
 package com.ceketrum.cei.data;
 
+import com.ceketrum.cei.i18n.CeiText;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -538,11 +539,11 @@ public class LootTableSourceManager {
 
             // Localisation et embellissement
             String categoryName = switch (category) {
-                case "chests" -> "Coffre";
-                case "entities" -> "Monstre";
-                case "gameplay" -> "Activité";
-                case "blocks" -> "Bloc";
-                case "archaeology" -> "Fouilles";
+                case "chests" -> CeiText.t("cei.loot.category.chests");
+                case "entities" -> CeiText.t("cei.loot.category.entities");
+                case "gameplay" -> CeiText.t("cei.loot.category.gameplay");
+                case "blocks" -> CeiText.t("cei.loot.category.blocks");
+                case "archaeology" -> CeiText.t("cei.loot.category.archaeology");
                 default -> category;
             };
 
@@ -557,8 +558,6 @@ public class LootTableSourceManager {
      * Cette base de données prend le relais en multijoueur ou lorsque le serveur n'est pas indexé.
      */
     private List<String> getFallbackSources(Item item) {
-        String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
-        boolean isFrench = lang != null && lang.toLowerCase().startsWith("fr");
 
         Identifier id = BuiltInRegistries.ITEM.getKey(item);
         if (id == null) return Collections.emptyList();
@@ -568,111 +567,111 @@ public class LootTableSourceManager {
 
         switch (path) {
             case "diamond":
-                sources.add(isFrench ? "Coffres de structures (Bastions, Forteresses, Temples du Désert, Mineshafts)" : "Structure chests (Bastions, Fortresses, Desert Temples, Mineshafts)");
-                sources.add(isFrench ? "Minerais de Diamant (Abysses Y < 0)" : "Diamond Ore (Deepslate Y < 0)");
+                sources.add(CeiText.t("cei.loot.src.diamond_chests"));
+                sources.add(CeiText.t("cei.loot.src.diamond_ore"));
                 break;
             case "netherite_scrap":
             case "ancient_debris":
-                sources.add(isFrench ? "Minerais de Débris Antiques (Nether, Y=8 à Y=22)" : "Ancient Debris Ore (Nether, Y=8 to Y=22)");
+                sources.add(CeiText.t("cei.loot.src.ancient_debris_ore"));
                 break;
             case "netherite_ingot":
-                sources.add(isFrench ? "Table de Smithing (Amélioration d'un outil en diamant)" : "Smithing Table (Upgrading diamond equipment)");
-                sources.add(isFrench ? "Coffres de Bastions" : "Bastion Remnant chests");
+                sources.add(CeiText.t("cei.loot.src.smithing_netherite"));
+                sources.add(CeiText.t("cei.loot.src.bastion_chests"));
                 break;
             case "blaze_rod":
-                sources.add(isFrench ? "Looté par les Blazes (Forteresses du Nether)" : "Dropped by Blazes (Nether Fortresses)");
+                sources.add(CeiText.t("cei.loot.src.blaze_drop"));
                 break;
             case "ender_pearl":
-                sources.add(isFrench ? "Looté par les Endermen" : "Dropped by Endermen");
-                sources.add(isFrench ? "Troc avec les Piglins (Or)" : "Bartering with Piglins (Gold)");
-                sources.add(isFrench ? "Échange avec les Clercs villageois" : "Trading with Clerc villagers");
+                sources.add(CeiText.t("cei.loot.src.enderman_drop"));
+                sources.add(CeiText.t("cei.loot.src.piglin_barter"));
+                sources.add(CeiText.t("cei.loot.src.cleric_trade"));
                 break;
             case "slime_ball":
-                sources.add(isFrench ? "Looté par les Slimes (Marécages, Chunks à Slime)" : "Dropped by Slimes (Swamps, Slime Chunks)");
-                sources.add(isFrench ? "Échange avec le Marchand Ambulant" : "Trading with Wandering Trader");
+                sources.add(CeiText.t("cei.loot.src.slime_drop"));
+                sources.add(CeiText.t("cei.loot.src.wandering_trader"));
                 break;
             case "saddle":
-                sources.add(isFrench ? "Coffres de structures (Donjons, Bastions, Forteresses)" : "Structure chests (Dungeons, Bastions, Fortresses)");
-                sources.add(isFrench ? "Obtenu par la Pêche" : "Obtained by Fishing");
+                sources.add(CeiText.t("cei.loot.src.saddle_chests"));
+                sources.add(CeiText.t("cei.loot.src.fishing"));
                 break;
             case "name_tag":
-                sources.add(isFrench ? "Coffres de structures, Pêche" : "Structure chests, Fishing");
-                sources.add(isFrench ? "Échange avec les Bibliothécaires" : "Trading with Librarians");
+                sources.add(CeiText.t("cei.loot.src.nametag_chests"));
+                sources.add(CeiText.t("cei.loot.src.librarian_trade"));
                 break;
             case "nether_star":
-                sources.add(isFrench ? "Looté par le Wither Boss" : "Dropped by the Wither Boss");
+                sources.add(CeiText.t("cei.loot.src.wither_drop"));
                 break;
             case "elytra":
-                sources.add(isFrench ? "Cadre dans les Bateaux de l'End (Cités de l'End)" : "Item Frame in End Ships (End Cities)");
+                sources.add(CeiText.t("cei.loot.src.elytra_frame"));
                 break;
             case "totem_of_undying":
-                sources.add(isFrench ? "Looté par les Évocateurs (Evokers - Raids / Manoirs)" : "Dropped by Evokers (Raids / Woodland Mansions)");
+                sources.add(CeiText.t("cei.loot.src.evoker_drop"));
                 break;
             case "heart_of_the_sea":
-                sources.add(isFrench ? "Trésors Enfouis (Buried Treasure)" : "Buried Treasure chests");
+                sources.add(CeiText.t("cei.loot.src.buried_treasure_chests"));
                 break;
             case "nautilus_shell":
-                sources.add(isFrench ? "Looté par les Noyés (Drowned), Pêche" : "Dropped by Drowned, Fishing");
-                sources.add(isFrench ? "Échange avec le Marchand Ambulant" : "Trading with Wandering Trader");
+                sources.add(CeiText.t("cei.loot.src.drowned_fishing"));
+                sources.add(CeiText.t("cei.loot.src.wandering_trader"));
                 break;
             case "sponge":
-                sources.add(isFrench ? "Monuments Océaniques (Gardien Ancien / Salles d'éponges)" : "Ocean Monuments (Elder Guardian / Sponge Rooms)");
+                sources.add(CeiText.t("cei.loot.src.sponge_room"));
                 break;
             case "wither_skeleton_skull":
-                sources.add(isFrench ? "Looté par les Squelettes Wither (Forteresses)" : "Dropped by Wither Skeletons (Fortresses)");
+                sources.add(CeiText.t("cei.loot.src.wither_skeleton_drop"));
                 break;
             case "dragon_egg":
-                sources.add(isFrench ? "Vaincre l'Ender Dragon (Haut du portail de retour)" : "Defeating the Ender Dragon (On top of exit portal)");
+                sources.add(CeiText.t("cei.loot.src.dragon_egg"));
                 break;
             case "trident":
-                sources.add(isFrench ? "Looté par les Noyés (Drowned)" : "Dropped by Drowned");
+                sources.add(CeiText.t("cei.loot.src.drowned_drop"));
                 break;
             case "string":
-                sources.add(isFrench ? "Looté par les Araignées, Toiles d'araignées" : "Dropped by Spiders, Cobwebs");
+                sources.add(CeiText.t("cei.loot.src.spider_drop"));
                 break;
             case "gunpowder":
-                sources.add(isFrench ? "Looté par les Creepers, Sorcières, Ghasts" : "Dropped by Creepers, Witches, Ghasts");
+                sources.add(CeiText.t("cei.loot.src.creeper_drop"));
                 break;
             case "bone":
-                sources.add(isFrench ? "Looté par les Squelettes" : "Dropped by Skeletons");
+                sources.add(CeiText.t("cei.loot.src.skeleton_drop"));
                 break;
             case "rotten_flesh":
-                sources.add(isFrench ? "Looté par les Zombies" : "Dropped by Zombies");
+                sources.add(CeiText.t("cei.loot.src.zombie_drop"));
                 break;
             case "leather":
-                sources.add(isFrench ? "Looté par les Vaches, Chevaux, Lamas" : "Dropped by Cows, Horses, Llamas");
+                sources.add(CeiText.t("cei.loot.src.cow_drop"));
                 break;
             case "feather":
-                sources.add(isFrench ? "Looté par les Poulets" : "Dropped by Chickens");
+                sources.add(CeiText.t("cei.loot.src.chicken_drop"));
                 break;
             case "ink_sac":
-                sources.add(isFrench ? "Looté par les Poulpes" : "Dropped by Squids");
+                sources.add(CeiText.t("cei.loot.src.squid_drop"));
                 break;
             case "glow_ink_sac":
-                sources.add(isFrench ? "Looté par les Poulpes Luisants" : "Dropped by Glow Squids");
+                sources.add(CeiText.t("cei.loot.src.glow_squid_drop"));
                 break;
             case "prismarine_shard":
             case "prismarine_crystals":
-                sources.add(isFrench ? "Looté par les Gardiens (Monuments Océaniques)" : "Dropped by Guardians (Ocean Monuments)");
+                sources.add(CeiText.t("cei.loot.src.guardian_drop"));
                 break;
             case "emerald":
-                sources.add(isFrench ? "Échanges villageois, Minerais d'Émeraude (Montagnes)" : "Villager trades, Emerald Ore (Mountains)");
+                sources.add(CeiText.t("cei.loot.src.emerald_trade"));
                 break;
             case "echo_shard":
-                sources.add(isFrench ? "Coffres des Cités Abyssales (Ancient City)" : "Ancient City chests");
+                sources.add(CeiText.t("cei.loot.src.echo_shard"));
                 break;
             case "disc_fragment_5":
-                sources.add(isFrench ? "Coffres des Cités Abyssales" : "Ancient City chests");
+                sources.add(CeiText.t("cei.loot.src.ancient_city_chests"));
                 break;
             case "disc_fragment_11":
             case "music_disc_11":
-                sources.add(isFrench ? "Un squelette doit tuer un creeper" : "A skeleton must shoot and kill a creeper");
+                sources.add(CeiText.t("cei.loot.src.disc_11"));
                 break;
             case "music_disc_otherside":
-                sources.add(isFrench ? "Coffres de Strongholds, Cités Abyssales" : "Stronghold or Ancient City chests");
+                sources.add(CeiText.t("cei.loot.src.disc_otherside"));
                 break;
             case "music_disc_relic":
-                sources.add(isFrench ? "Fouilles de Ruines du Sentier (Trail Ruins)" : "Brushing Trail Ruins suspicious gravel");
+                sources.add(CeiText.t("cei.loot.src.disc_relic"));
                 break;
             case "snort_pottery_sherd":
             case "prize_pottery_sherd":
@@ -696,15 +695,15 @@ public class LootTableSourceManager {
             case "flow_pottery_sherd":
             case "guster_pottery_sherd":
             case "scrape_pottery_sherd":
-                sources.add(isFrench ? "Fouilles des Chambres des Épreuves (Pots Décorés / Vases)" : "Trial Chambers excavations (Decorated Pots / Vases)");
+                sources.add(CeiText.t("cei.loot.src.sherd_trial"));
                 break;
             case "shelter_pottery_sherd":
-                sources.add(isFrench ? "Fouilles archéologiques (Gravel/Sable Suspect)" : "Archaeological excavations (Suspicious Gravel/Sand)");
+                sources.add(CeiText.t("cei.loot.src.sherd_archaeology"));
                 break;
             case "enchanted_book":
-                sources.add(isFrench ? "Coffres de structures (Donjons, Strongholds, Temples, Cités)" : "Structure chests (Dungeons, Strongholds, Temples, Cities)");
-                sources.add(isFrench ? "Échanges villageois (Bibliothécaires)" : "Villager trades (Librarians)");
-                sources.add(isFrench ? "Pêche, Table d'enchantement" : "Fishing, Enchanting table");
+                sources.add(CeiText.t("cei.loot.src.book_chests"));
+                sources.add(CeiText.t("cei.loot.src.book_trade"));
+                sources.add(CeiText.t("cei.loot.src.book_fishing"));
                 break;
             case "oak_sapling":
             case "spruce_sapling":
@@ -714,7 +713,7 @@ public class LootTableSourceManager {
             case "dark_oak_sapling":
             case "cherry_sapling":
             case "mangrove_propagule":
-                sources.add(isFrench ? "Obtenu en cassant les feuilles de l'arbre correspondant" : "Obtained by breaking leaves of the corresponding tree");
+                sources.add(CeiText.t("cei.loot.src.sapling_leaves"));
                 break;
             case "oak_log":
             case "spruce_log":
@@ -724,13 +723,13 @@ public class LootTableSourceManager {
             case "dark_oak_log":
             case "mangrove_log":
             case "cherry_log":
-                sources.add(isFrench ? "Couper le tronc de l'arbre correspondant" : "Chop down the trunk of the corresponding tree");
+                sources.add(CeiText.t("cei.loot.src.log_chop"));
                 break;
             case "heavy_core":
-                sources.add(isFrench ? "Récompense de Coffre-fort des Chambres des Épreuves (Trial Vault)" : "Ominous Trial Vault reward (Trial Chambers)");
+                sources.add(CeiText.t("cei.loot.src.heavy_core_vault"));
                 break;
             case "breeze_rod":
-                sources.add(isFrench ? "Looté par les Breezes (Chambres des Épreuves)" : "Dropped by Breezes (Trial Chambers)");
+                sources.add(CeiText.t("cei.loot.src.breeze_drop"));
                 break;
         }
 
@@ -746,8 +745,6 @@ public class LootTableSourceManager {
             return memo;
         }
 
-        String lang = ItemDescriptionManager.getInstance().getCurrentLanguage();
-        boolean isFrench = lang != null && lang.toLowerCase().startsWith("fr");
 
         Set<String> locations = new LinkedHashSet<>();
 
@@ -755,7 +752,7 @@ public class LootTableSourceManager {
         List<Identifier> ids = itemToLootIds.get(item);
         if (ids != null) {
             for (Identifier id : ids) {
-                String loc = parseLocationFromLootId(id, isFrench);
+                String loc = parseLocationFromLootId(id);
                 if (loc != null) {
                     locations.add(loc);
                 }
@@ -763,12 +760,12 @@ public class LootTableSourceManager {
         }
 
         // 2. Fallbacks/Overrides
-        List<String> fallbacks = getFallbackWorldLocations(item, isFrench);
+        List<String> fallbacks = getFallbackWorldLocations(item);
         locations.addAll(fallbacks);
 
         // If still empty, return Everywhere / Not specified
         if (locations.isEmpty()) {
-            locations.add(isFrench ? "Partout dans le monde / Non spécifié" : "Everywhere / Not specified");
+            locations.add(CeiText.t("cei.loot.where.unspecified"));
         }
 
         List<String> result = new ArrayList<>(locations);
@@ -776,124 +773,124 @@ public class LootTableSourceManager {
         return result;
     }
 
-    private String parseLocationFromLootId(Identifier id, boolean isFrench) {
+    private String parseLocationFromLootId(Identifier id) {
         String path = id.getPath();
         if (path.contains("desert_pyramid")) {
-            return isFrench ? "Temple du Désert / Desert Pyramid" : "Desert Pyramid / Temple du Désert";
+            return CeiText.t("cei.loot.struct.desert_pyramid");
         }
         if (path.contains("desert_well")) {
-            return isFrench ? "Puits du Désert / Desert Well" : "Desert Well / Puits du Désert";
+            return CeiText.t("cei.loot.struct.desert_well");
         }
         if (path.contains("mineshaft") || path.contains("abandoned_mineshaft")) {
-            return isFrench ? "Mines Abandonnées / Abandoned Mineshaft" : "Abandoned Mineshaft / Mines Abandonnées";
+            return CeiText.t("cei.loot.struct.mineshaft");
         }
         if (path.contains("jungle_temple") || path.contains("jungle_pyramid")) {
-            return isFrench ? "Temple de la Jungle / Jungle Temple" : "Jungle Temple / Temple de la Jungle";
+            return CeiText.t("cei.loot.struct.jungle_temple");
         }
         if (path.contains("stronghold")) {
-            return isFrench ? "Forteresse Souterraine / Stronghold" : "Stronghold / Forteresse Souterraine";
+            return CeiText.t("cei.loot.struct.stronghold");
         }
         if (path.contains("bastion")) {
-            return isFrench ? "Vestiges de Bastion / Bastion Remnant" : "Bastion Remnant / Vestiges de Bastion";
+            return CeiText.t("cei.loot.struct.bastion");
         }
         if (path.contains("ancient_city")) {
-            return isFrench ? "Cité Abyssale / Ancient City" : "Ancient City / Cité Abyssale";
+            return CeiText.t("cei.loot.struct.ancient_city");
         }
         if (path.contains("end_city")) {
-            return isFrench ? "Cité de l'End / End City" : "End City / Cité de l'End";
+            return CeiText.t("cei.loot.struct.end_city");
         }
         if (path.contains("buried_treasure")) {
-            return isFrench ? "Trésor Enfoui / Buried Treasure" : "Buried Treasure / Trésor Enfoui";
+            return CeiText.t("cei.loot.struct.buried_treasure");
         }
         if (path.contains("simple_dungeon") || path.contains("dungeon")) {
-            return isFrench ? "Donjon / Dungeon" : "Dungeon / Donjon";
+            return CeiText.t("cei.loot.struct.dungeon");
         }
         if (path.contains("woodland_mansion") || path.contains("mansion")) {
-            return isFrench ? "Manoir en Forêt / Woodland Mansion" : "Woodland Mansion / Manoir en Forêt";
+            return CeiText.t("cei.loot.struct.woodland_mansion");
         }
         if (path.contains("shipwreck")) {
-            return isFrench ? "Épave de Bateau / Shipwreck" : "Shipwreck / Épave de Bateau";
+            return CeiText.t("cei.loot.struct.shipwreck");
         }
         if (path.contains("pillager_outpost") || path.contains("outpost")) {
-            return isFrench ? "Avant-poste de Pillards / Pillager Outpost" : "Pillager Outpost / Avant-poste de Pillards";
+            return CeiText.t("cei.loot.struct.pillager_outpost");
         }
         if (path.contains("ruined_portal")) {
-            return isFrench ? "Portail Ruiné / Ruined Portal" : "Ruined Portal / Portail Ruiné";
+            return CeiText.t("cei.loot.struct.ruined_portal");
         }
         if (path.contains("trail_ruins") || path.contains("trail_ruin")) {
-            return isFrench ? "Ruines du Sentier / Trail Ruins" : "Trail Ruins / Ruines du Sentier";
+            return CeiText.t("cei.loot.struct.trail_ruins");
         }
         if (path.contains("ocean_ruin")) {
-            return isFrench ? "Ruines Océaniques / Ocean Ruins" : "Ocean Ruins / Ruines Océaniques";
+            return CeiText.t("cei.loot.struct.ocean_ruin");
         }
         if (path.contains("trial_chambers") || path.contains("trial_chamber") || path.contains("trial/")) {
-            return isFrench ? "Chambres des Épreuves / Trial Chambers" : "Trial Chambers / Chambres des Épreuves";
+            return CeiText.t("cei.loot.struct.trial_chambers");
         }
         if (path.contains("fortress") || path.contains("nether_bridge")) {
-            return isFrench ? "Forteresse du Nether / Nether Fortress" : "Nether Fortress / Forteresse du Nether";
+            return CeiText.t("cei.loot.struct.fortress");
         }
         if (path.contains("monument") || path.contains("ocean_monument")) {
-            return isFrench ? "Monument Océanique / Ocean Monument" : "Ocean Monument / Monument Océanique";
+            return CeiText.t("cei.loot.struct.monument");
         }
         if (path.contains("village")) {
-            return isFrench ? "Village" : "Village";
+            return CeiText.t("cei.loot.struct.village");
         }
         if (path.contains("swamp") || path.contains("witch")) {
-            return isFrench ? "Marais / Swamp" : "Swamp / Marais";
+            return CeiText.t("cei.loot.struct.swamp");
         }
         if (path.contains("cherry_grove")) {
-            return isFrench ? "Forêt de Cerisiers / Cherry Grove" : "Cherry Grove / Forêt de Cerisiers";
+            return CeiText.t("cei.loot.struct.cherry_grove");
         }
         return null;
     }
 
-    private List<String> getFallbackWorldLocations(Item item, boolean isFrench) {
+    private List<String> getFallbackWorldLocations(Item item) {
         Identifier id = BuiltInRegistries.ITEM.getKey(item);
         if (id == null) return Collections.emptyList();
         String path = id.getPath();
 
         List<String> locs = new ArrayList<>();
         if (path.equals("diamond") || path.equals("diamond_ore") || path.equals("deepslate_diamond_ore")) {
-            locs.add(isFrench ? "Sous-sol (Abysses Y < 0)" : "Underground (Deepslate Y < 0)");
-            locs.add(isFrench ? "Temples, Mines, Bastions (Coffres)" : "Temples, Mineshafts, Bastions (Chests)");
+            locs.add(CeiText.t("cei.loot.where.underground"));
+            locs.add(CeiText.t("cei.loot.where.structure_chests"));
         } else if (path.equals("ancient_debris") || path.equals("netherite_scrap")) {
-            locs.add(isFrench ? "Nether (Y: 8 à 22)" : "The Nether (Y: 8 to 22)");
+            locs.add(CeiText.t("cei.loot.where.nether_debris"));
         } else if (path.equals("netherite_ingot")) {
-            locs.add(isFrench ? "Vestiges de Bastion (Treasure chests)" : "Bastion Remnants (Treasure chests)");
+            locs.add(CeiText.t("cei.loot.where.bastion_treasure"));
         } else if (path.equals("blaze_rod")) {
-            locs.add(isFrench ? "Forteresses du Nether (Blazes)" : "Nether Fortresses (Blazes)");
+            locs.add(CeiText.t("cei.loot.where.nether_fortress_blaze"));
         } else if (path.equals("ender_pearl")) {
-            locs.add(isFrench ? "Forêt Distordue (Nether), L'End" : "Warped Forest (Nether), The End");
+            locs.add(CeiText.t("cei.loot.where.warped_forest_end"));
         } else if (path.equals("elytra")) {
-            locs.add(isFrench ? "Bateaux de l'End (Cités de l'End)" : "End Ships (End Cities)");
+            locs.add(CeiText.t("cei.loot.where.end_ships"));
         } else if (path.equals("totem_of_undying")) {
-            locs.add(isFrench ? "Manoirs en Forêt (Évocateurs), Raids" : "Woodland Mansions (Evokers), Raids");
+            locs.add(CeiText.t("cei.loot.where.mansions_raids"));
         } else if (path.equals("heart_of_the_sea")) {
-            locs.add(isFrench ? "Trésors Enfouis" : "Buried Treasures");
+            locs.add(CeiText.t("cei.loot.where.buried_treasures"));
         } else if (path.equals("heavy_core") || path.equals("breeze_rod")) {
-            locs.add(isFrench ? "Chambres des Épreuves" : "Trial Chambers");
+            locs.add(CeiText.t("cei.loot.where.trial_chambers"));
         } else if (path.contains("pottery_sherd")) {
-            locs.add(isFrench ? "Ruines du Sentier, Chambres des Épreuves, Temples (Archéologie)" : "Trail Ruins, Trial Chambers, Temples (Archaeology)");
+            locs.add(CeiText.t("cei.loot.where.archaeology"));
         } else if (path.contains("template")) {
             if (path.contains("netherite")) {
-                locs.add(isFrench ? "Bastions (Salles des Trésors)" : "Bastions (Treasure Rooms)");
+                locs.add(CeiText.t("cei.loot.where.bastion_rooms"));
             } else if (path.contains("tide")) {
-                locs.add(isFrench ? "Monuments Océaniques" : "Ocean Monuments");
+                locs.add(CeiText.t("cei.loot.where.ocean_monuments"));
             } else if (path.contains("sentry")) {
-                locs.add(isFrench ? "Avant-postes de Pillards" : "Pillager Outposts");
+                locs.add(CeiText.t("cei.loot.where.pillager_outposts"));
             } else if (path.contains("coast")) {
-                locs.add(isFrench ? "Épaves de Bateaux" : "Shipwrecks");
+                locs.add(CeiText.t("cei.loot.where.shipwrecks"));
             } else if (path.contains("wild")) {
-                locs.add(isFrench ? "Temples de la Jungle" : "Jungle Temples");
+                locs.add(CeiText.t("cei.loot.where.jungle_temples"));
             } else if (path.contains("ward") || path.contains("silence")) {
-                locs.add(isFrench ? "Cités Abyssales" : "Ancient Cities");
+                locs.add(CeiText.t("cei.loot.where.ancient_cities"));
             } else if (path.contains("spire")) {
-                locs.add(isFrench ? "Cités de l'End" : "End Cities");
+                locs.add(CeiText.t("cei.loot.where.end_cities"));
             } else {
-                locs.add(isFrench ? "Temples, Forts, Chambres des Épreuves" : "Temples, Strongholds, Trial Chambers");
+                locs.add(CeiText.t("cei.loot.where.temples_strongholds"));
             }
         } else if (path.contains("cherry")) {
-            locs.add(isFrench ? "Biomes Forêt de Cerisiers (Cherry Grove)" : "Cherry Grove biomes");
+            locs.add(CeiText.t("cei.loot.where.cherry_biomes"));
         }
         return locs;
     }

@@ -1,5 +1,6 @@
 package com.ceketrum.cei.gui.module.cei.recipe.view;
 
+import com.ceketrum.cei.i18n.CeiText;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
@@ -123,7 +124,7 @@ public final class CeiRecipeAdapter {
         }
         Identifier typeId = typeIdOf(recipe);
         if (station.isEmpty()) station = CeiRecipeStation.iconFor(typeId);
-        String title = typeId == null ? "Recette" : CeiRecipeStation.labelFor(typeId, false);
+        String title = typeId == null ? CeiText.t("cei.recipe.generic") : CeiRecipeStation.labelFor(typeId);
         return new CeiRecipeView(kind, w, h, slots, outputs, station, Component.literal(title));
     }
 

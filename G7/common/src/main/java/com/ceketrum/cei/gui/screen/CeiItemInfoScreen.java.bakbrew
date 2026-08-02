@@ -1,0 +1,2529 @@
+package com.ceketrum.cei.gui.screen;
+
+import com.ceketrum.cei.i18n.CeiText;
+import com.ceketrum.cei.data.BrewingRecipeManager;
+import com.ceketrum.cei.data.ItemDescriptionManager;
+import com.ceketrum.cei.data.LootTableSourceManager;
+import com.ceketrum.cei.data.BlockGenerationManager;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import com.ceketrum.cei.gui.constants.GuiConstants;
+import com.ceketrum.cei.gui.util.GuiRenderHelper;
+import com.ceketrum.cei.gui.util.TextRenderHelper;
+import com.ceketrum.cei.gui.module.cei.components.RecipePopupRenderer;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.level.block.Block;
+import java.util.HashSet;
+import java.util.Collection;
+import net.minecraft.world.item.crafting.display.RecipeDisplay;
+import net.minecraft.util.context.ContextMap;
+
+/**
+ * Premium glassmorphic recipe book and info screen.
+ * Accessible by pressing R or U keys on any item.
+ */
+public class CeiItemInfoScreen extends Screen {
+    private Screen parentScreen;
+
+    public void setParentScreen(Screen parentScreen) {
+        this.parentScreen = parentScreen;
+    }
+    private final ItemStack targetStack;
+    private boolean isUsage;
+    private com.ceketrum.cei.gui.module.cei.CeiModule ceiModule;
+    private float currentOpacity = 1.0f;
+
+    // Position and size
+    private int containerWidth = 240;
+    private int containerHeight = 180;
+    private int containerX;
+    private int containerY;
+
+    // Tabs configuration
+    public enum TabType {
+        DESCRIPTION,
+        CRAFTING,
+        USAGES,
+        LOOT,
+        WORLD
+    }
+
+    public enum CategoryType {
+        CRAFTING,
+        SMELTING,
+        BREWING,
+        STONECUTTING,
+        SMITHING,
+        CUSTOM
+    }
+
+    public static class RecipeCategory {
+        public final CategoryType type;
+        public final Identifier customRecipeTypeId; // null if vanilla category
+
+        public RecipeCategory(CategoryType type) {
+            this.type = type;
+            this.customRecipeTypeId = null;
+        }
+
+        public RecipeCategory(CategoryType type, Identifier customRecipeTypeId) {
+            this.type = type;
+            this.customRecipeTypeId = customRecipeTypeId;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            RecipeCategory that = (RecipeCategory) o;
+            if (type != that.type) return false;
+            return java.util.Objects.equals(customRecipeTypeId, that.customRecipeTypeId);
+        }
+
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(type, customRecipeTypeId);
+        }
+    }
+
+    private final List<TabType> visibleMainTabs = new ArrayList<>();
+    private TabType activeMainTab;
+
+    private final List<RecipeCategory> categories = new ArrayList<>();
+    private RecipeCategory activeCategory;
+
+    /** Onglets de categorie affiches simultanement dans la colonne de gauche. */
+    private static final int MAX_VISIBLE_CATEGORIES = 6;
+    /** Hauteur des boutons de defilement. */
+    private static final int SCROLL_BTN_H = 12;
+    /** Index du premier onglet affiche. */
+    private int categoryScroll = 0;
+    private int currentPage = 0;
+
+    // Recipes database for target item (Output)
+    private final List<RecipeHolder<?>> craftingRecipes = new ArrayList<>();
+    private final List<RecipeHolder<?>> smeltingRecipes = new ArrayList<>();
+    private final List<RecipeHolder<?>> smithingRecipes = new ArrayList<>();
+    private final List<RecipeHolder<?>> stonecuttingRecipes = new ArrayList<>();
+    private final List<BrewingRecipeManager.BrewingRecipe> brewingRecipes = new ArrayList<>();
+    private final List<RecipeHolder<?>> customRecipes = new ArrayList<>();
+
+    // Usages database for target item (Input)
+    private final List<RecipeHolder<?>> craftingUsages = new ArrayList<>();
+    private final List<RecipeHolder<?>> smeltingUsages = new ArrayList<>();
+    private final List<RecipeHolder<?>> smithingUsages = new ArrayList<>();
+    private final List<RecipeHolder<?>> stonecuttingUsages = new ArrayList<>();
+    private final List<BrewingRecipeManager.BrewingRecipe> brewingUsages = new ArrayList<>();
+    private final List<RecipeHolder<?>> customUsages = new ArrayList<>();
+
+    // Active slots for click/hover tracking
+    private static class RenderedSlot {
+        public final ItemStack stack;
+        public final int x;
+        public final int y;
+        public final int size;
+
+        public RenderedSlot(ItemStack stack, int x, int y, int size) {
+            this.stack = stack;
+            this.x = x;
+            this.y = y;
+            this.size = size;
+        }
+    }
+
+    private final List<RenderedSlot> activeSlots = new ArrayList<>();
+    private RenderedSlot hoveredSlot = null;
+
+    public CeiItemInfoScreen(Screen parentScreen, ItemStack targetStack, boolean isUsage) {
+        super(Component.literal(CeiText.t("cei.screen.item_info")));
+        this.parentScreen = parentScreen;
+        this.targetStack = targetStack.copy();
+        this.isUsage = isUsage;
+
+        // Restore pinned state if identical item is pinned
+        var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
+        var card = manager.getPinnedCard(targetStack);
+        if (card != null) {
+            this.activeMainTab = card.getActiveTab();
+            this.activeCategory = card.getActiveCategory();
+            this.currentPage = card.getCurrentPage();
+        } else {
+            this.activeMainTab = isUsage ? TabType.USAGES : TabType.CRAFTING;
+        }
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+
+        this.containerX = (this.width - this.containerWidth) / 2;
+        this.containerY = (this.height - this.containerHeight) / 2;
+
+        // Quality of Life: reuse parent screen's CeiModule to preserve search queries, scroll position, and favorites state!
+        Screen moduleScreen = this.parentScreen != null ? this.parentScreen : this;
+        this.ceiModule = com.ceketrum.cei.gui.util.CeiScreenHelper.getOrCreateModule(moduleScreen);
+        this.ceiModule.init();
+
+        // Scan recipes
+        scanRecipes();
+
+        // Update tabs visibility
+        updateMainTabs();
+
+        // Smart tab selection
+        if (activeMainTab == TabType.CRAFTING && craftingRecipes.isEmpty() && smeltingRecipes.isEmpty() && brewingRecipes.isEmpty() && stonecuttingRecipes.isEmpty() && smithingRecipes.isEmpty() && customRecipes.isEmpty()) {
+            boolean hasUsages = !craftingUsages.isEmpty() || !smeltingUsages.isEmpty() || !brewingUsages.isEmpty() || !stonecuttingUsages.isEmpty() || !smithingUsages.isEmpty() || !customUsages.isEmpty();
+            if (hasUsages) {
+                activeMainTab = TabType.USAGES;
+            } else {
+                activeMainTab = TabType.DESCRIPTION;
+            }
+        }
+        if (activeMainTab == TabType.USAGES && craftingUsages.isEmpty() && smeltingUsages.isEmpty() && brewingUsages.isEmpty() && stonecuttingUsages.isEmpty() && smithingUsages.isEmpty() && customUsages.isEmpty()) {
+            boolean hasRecipes = !craftingRecipes.isEmpty() || !smeltingRecipes.isEmpty() || !brewingRecipes.isEmpty() || !stonecuttingRecipes.isEmpty() || !smithingRecipes.isEmpty() || !customRecipes.isEmpty();
+            if (hasRecipes) {
+                activeMainTab = TabType.CRAFTING;
+            } else {
+                activeMainTab = TabType.DESCRIPTION;
+            }
+        }
+
+        // Validate starting main tab
+        if (!visibleMainTabs.contains(activeMainTab)) {
+            activeMainTab = TabType.DESCRIPTION;
+        }
+
+        // Update categories
+        updateCategories();
+    }
+
+    private void scanRecipes() {
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.level == null) return;
+
+        craftingRecipes.clear();
+        smeltingRecipes.clear();
+        smithingRecipes.clear();
+        stonecuttingRecipes.clear();
+        brewingRecipes.clear();
+        customRecipes.clear();
+
+        craftingUsages.clear();
+        smeltingUsages.clear();
+        smithingUsages.clear();
+        stonecuttingUsages.clear();
+        brewingUsages.clear();
+        customUsages.clear();
+
+        // L'ancien code balayait toutes les recettes du pack en lancant DEUX
+        // explorations reflexives par recette -- 244 ms mesurees sur G4 a chaque
+        // ouverture de fiche. Le meme travail est desormais fait une seule fois
+        // dans CeiRecipeIndex, et l'ouverture se resume a deux acces de table.
+        com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex.ensureBuilt(client);
+
+        for (var entry : com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex
+                .producedBy(targetStack.getItem())) {
+            categorizeRecipe(entry, false);
+        }
+        for (var entry : com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex
+                .usedIn(targetStack.getItem())) {
+            categorizeRecipe(entry, true);
+        }
+
+        // 3. Scan Brewing recipes
+        var brewingOutputs = BrewingRecipeManager.getInstance().getRecipesForOutput(targetStack);
+        brewingRecipes.addAll(brewingOutputs);
+
+        var brewingInputs = BrewingRecipeManager.getInstance().getRecipesForInput(targetStack);
+        brewingUsages.addAll(brewingInputs);
+    }
+
+    private void categorizeRecipe(RecipeHolder<?> entry, boolean isUsage) {
+        Recipe<?> recipe = entry.value();
+        var type = recipe.getType();
+
+        if (type == net.minecraft.world.item.crafting.RecipeType.CRAFTING) {
+            if (isUsage) craftingUsages.add(entry); else craftingRecipes.add(entry);
+        } else if (type == net.minecraft.world.item.crafting.RecipeType.SMELTING ||
+                   type == net.minecraft.world.item.crafting.RecipeType.BLASTING ||
+                   type == net.minecraft.world.item.crafting.RecipeType.SMOKING ||
+                   type == net.minecraft.world.item.crafting.RecipeType.CAMPFIRE_COOKING) {
+            if (isUsage) smeltingUsages.add(entry); else smeltingRecipes.add(entry);
+        } else if (type == net.minecraft.world.item.crafting.RecipeType.SMITHING) {
+            if (isUsage) smithingUsages.add(entry); else smithingRecipes.add(entry);
+        } else if (type == net.minecraft.world.item.crafting.RecipeType.STONECUTTING) {
+            if (isUsage) stonecuttingUsages.add(entry); else stonecuttingRecipes.add(entry);
+        } else {
+            if (isUsage) customUsages.add(entry); else customRecipes.add(entry);
+        }
+    }
+
+    private void updateMainTabs() {
+        visibleMainTabs.clear();
+        visibleMainTabs.add(TabType.DESCRIPTION);
+        visibleMainTabs.add(TabType.CRAFTING);
+        visibleMainTabs.add(TabType.USAGES);
+
+        // Loot eligibility
+        List<String> lootSources = LootTableSourceManager.getInstance().getSourcesForItem(targetStack.getItem());
+        if (!lootSources.isEmpty()) {
+            visibleMainTabs.add(TabType.LOOT);
+        }
+
+        // World location eligibility
+        List<String> locations = LootTableSourceManager.getInstance().getWorldLocationsForItem(targetStack.getItem());
+        List<String> blockGen = BlockGenerationManager.getInstance().getBlockGenerationSources(targetStack.getItem());
+        String worldPlaceholder = CeiText.t("cei.loot.where.unspecified");
+        // On compare a la valeur reellement produite, pas a une copie
+        // figee : les deux chaines qui etaient ici n'existaient plus
+        // depuis que le libelle est traduit, et l'onglet s'affichait
+        // donc pour des items qui n'avaient rien a y montrer.
+        boolean hasWorldLocs = !locations.isEmpty()
+                && !(locations.size() == 1 && locations.contains(worldPlaceholder));
+        boolean hasBlockGen = !blockGen.isEmpty();
+
+        if (hasWorldLocs || hasBlockGen) {
+            visibleMainTabs.add(TabType.WORLD);
+        }
+    }
+
+    private void updateCategories() {
+        categories.clear();
+        // La colonne change de contenu : on revient en haut, sinon on peut
+        // rester bloque sur une fenetre qui n'existe plus.
+        categoryScroll = 0;
+        categoryScrollAnim = 0f;   // pas de glissement a l'ouverture
+        if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
+            boolean useUsages = (activeMainTab == TabType.USAGES);
+            var craftList = useUsages ? craftingUsages : craftingRecipes;
+            var smeltList = useUsages ? smeltingUsages : smeltingRecipes;
+            var brewList = useUsages ? brewingUsages : brewingRecipes;
+            var stoneList = useUsages ? stonecuttingUsages : stonecuttingRecipes;
+            var smithList = useUsages ? smithingUsages : smithingRecipes;
+            var customList = useUsages ? customUsages : customRecipes;
+
+            if (!craftList.isEmpty()) categories.add(new RecipeCategory(CategoryType.CRAFTING));
+            if (!smeltList.isEmpty()) categories.add(new RecipeCategory(CategoryType.SMELTING));
+            if (!brewList.isEmpty()) categories.add(new RecipeCategory(CategoryType.BREWING));
+            if (!stoneList.isEmpty()) categories.add(new RecipeCategory(CategoryType.STONECUTTING));
+            if (!smithList.isEmpty()) categories.add(new RecipeCategory(CategoryType.SMITHING));
+
+            if (!customList.isEmpty()) {
+                Set<Identifier> customTypes = new LinkedHashSet<>();
+                for (Object recipeObj : customList) {
+                    Recipe<?> r = getRecipeFromObj(recipeObj);
+                    if (r != null) {
+                        Identifier typeId = BuiltInRegistries.RECIPE_TYPE.getKey(r.getType());
+                        if (typeId != null) {
+                            customTypes.add(typeId);
+                        }
+                    }
+                }
+                for (Identifier typeId : customTypes) {
+                    categories.add(new RecipeCategory(CategoryType.CUSTOM, typeId));
+                }
+            }
+
+            if (!categories.isEmpty()) {
+                activeCategory = categories.get(0);
+            } else {
+                activeCategory = null;
+            }
+        } else {
+            activeCategory = null;
+        }
+        currentPage = 0;
+    }
+
+    private List<?> getActiveRecipesList() {
+        if (activeCategory == null) return java.util.Collections.emptyList();
+        boolean useUsages = (activeMainTab == TabType.USAGES);
+        return switch (activeCategory.type) {
+            case CRAFTING -> useUsages ? craftingUsages : craftingRecipes;
+            case SMELTING -> useUsages ? smeltingUsages : smeltingRecipes;
+            case BREWING -> useUsages ? brewingUsages : brewingRecipes;
+            case STONECUTTING -> useUsages ? stonecuttingUsages : stonecuttingRecipes;
+            case SMITHING -> useUsages ? smithingUsages : smithingRecipes;
+            case CUSTOM -> {
+                List<Object> filtered = new ArrayList<>();
+                List<?> rawList = useUsages ? customUsages : customRecipes;
+                for (Object recipeObj : rawList) {
+                    Recipe<?> r = getRecipeFromObj(recipeObj);
+                    if (r != null) {
+                        Identifier typeId = BuiltInRegistries.RECIPE_TYPE.getKey(r.getType());
+                        if (java.util.Objects.equals(typeId, activeCategory.customRecipeTypeId)) {
+                            filtered.add(recipeObj);
+                        }
+                    }
+                }
+                yield filtered;
+            }
+        };
+    }
+
+    private int getMaxPages() {
+        List<?> list = getActiveRecipesList();
+        if (list.isEmpty()) return 0;
+        return list.size();
+    }
+
+    @Override
+    public void extractBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        // Overridden to do nothing to prevent super.extractRenderState() from drawing the background/blur shader on top of our GUI!
+    }
+
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
+        var card = manager.getPinnedCard(this.targetStack);
+        int currentXOffset = card != null ? (int) card.getxOffset() : 0;
+        int currentYOffset = card != null ? (int) card.getyOffset() : 0;
+
+        this.containerX = (this.width - this.containerWidth) / 2 + currentXOffset;
+        this.containerY = (this.height - this.containerHeight) / 2 + currentYOffset;
+
+        // 1. Draw the native background blur shader and dimming first (flouts the world cleanly in the background)
+        // ONLY if this is the active current screen (not rendered as an overlay on top of inventory!)
+        if (com.ceketrum.cei.gui.util.CeiScreens.current() == this) {
+            super.extractBackground(context, mouseX, mouseY, delta);
+        }
+
+        this.currentOpacity = card != null ? card.getOpacity() : 1.0f;
+        float currentOpacity = this.currentOpacity;
+
+        // Draw background shadow
+        int shadowColor = applyOpacity(0x80000000, currentOpacity);
+        context.fill(containerX + 3, containerY + 3, containerX + containerWidth + 3, containerY + containerHeight + 3, shadowColor);
+
+        // Draw Main & Category Tab backgrounds FIRST (drawn behind the main container border/bg)
+        drawMainTabsBackground(context, mouseX, mouseY, currentOpacity);
+        drawCategoryTabsBackground(context, mouseX, mouseY, currentOpacity);
+
+        int bgColor = applyOpacity(0xD9101010, currentOpacity); // Dark premium glass
+        GuiRenderHelper.drawRoundedBackground(context, containerX, containerY, containerWidth, containerHeight, 12, bgColor);
+        int borderColor = applyOpacity(0x33FFFFFF, currentOpacity); // glowing silver border
+        context.outline(containerX, containerY, containerWidth, containerHeight, borderColor);
+
+        // Draw Title (Target Item Name)
+        String titleText = targetStack.getHoverName().getString();
+        String truncatedTitle = TextRenderHelper.truncateText(titleText, containerWidth - 60, this.font); // left space for header buttons
+        int titleWidth = this.font.width(truncatedTitle);
+        context.text(this.font, Component.literal(truncatedTitle).withStyle(ChatFormatting.GOLD),
+                        containerX + (containerWidth - titleWidth) / 2, containerY + 8, applyOpacity(0xFFFFFFFF, currentOpacity), false);
+        context.fill(containerX + 10, containerY + 20, containerX + containerWidth - 10, containerY + 21, applyOpacity(0x22FFFFFF, currentOpacity));
+
+        // Draw Header Action Buttons (Pin, HUD, Opacity)
+        drawHeaderButtons(context, mouseX, mouseY);
+
+        // Reset active slots for hover detection
+        activeSlots.clear();
+        hoveredSlot = null;
+
+        // Draw Tab Icons on top
+        drawMainTabsIcons(context);
+        drawCategoryTabsIcons(context);
+
+        // Draw Tab Content
+        drawTabContent(context, mouseX, mouseY);
+
+        // Render the CEI Search Panel and Item list on the side (NOT blurred!)
+        // ONLY if this is the active current screen (do not render list if overlay!)
+        if (this.ceiModule != null && com.ceketrum.cei.gui.util.CeiScreens.current() == this) {
+            this.ceiModule.render(
+                context,
+                mouseX,
+                mouseY,
+                this.width,
+                this.height,
+                this.font,
+                this.minecraft.getConnection().recipes(),
+                this.minecraft.level.registryAccess()
+            );
+        }
+
+        // Draw Tooltips (Hovered slot or Tab icons)
+        drawTooltips(context, mouseX, mouseY);
+
+        super.extractRenderState(context, mouseX, mouseY, delta);
+    }
+
+    private void drawHeaderButtons(GuiGraphicsExtractor context, int mouseX, int mouseY) {
+        var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
+        var card = manager.getPinnedCard(this.targetStack);
+        boolean isPinned = card != null;
+
+        // 1. PIN button
+        int pinX = containerX + 6;
+        int pinY = containerY + 5;
+        boolean hoverPin = mouseX >= pinX && mouseX < pinX + 12 && mouseY >= pinY && mouseY < pinY + 12;
+        int pinBg = hoverPin ? 0x66FFFFFF : (isPinned ? 0xAAFFD700 : 0x22FFFFFF); // Golden color if pinned!
+        context.fill(pinX, pinY, pinX + 12, pinY + 12, pinBg);
+        context.outline(pinX, pinY, 12, 12, isPinned ? 0xFFFFD700 : 0x44FFFFFF);
+        // Draw a small anchor/pin dot in the center
+        context.fill(pinX + 5, pinY + 3, pinX + 7, pinY + 9, 0xFFFFFFFF);
+        context.fill(pinX + 3, pinY + 5, pinX + 9, pinY + 7, 0xFFFFFFFF);
+
+        if (isPinned) {
+            // 2. HUD button
+            int hudX = containerX + 20;
+            int hudY = containerY + 5;
+            boolean showInHud = card.isShowInHud();
+            boolean hoverHud = mouseX >= hudX && mouseX < hudX + 12 && mouseY >= hudY && mouseY < hudY + 12;
+            int hudBg = hoverHud ? 0x66FFFFFF : (showInHud ? 0xAA00FF00 : 0x22FFFFFF); // Green color if active!
+            context.fill(hudX, hudY, hudX + 12, hudY + 12, hudBg);
+            context.outline(hudX, hudY, 12, 12, showInHud ? 0xFF00FF00 : 0x44FFFFFF);
+            // Draw a small eye (horizontal line + center dot)
+            context.fill(hudX + 3, hudY + 5, hudX + 9, hudY + 7, 0xFFFFFFFF);
+            context.fill(hudX + 5, hudY + 4, hudX + 7, hudY + 8, 0xFFFFFFFF);
+
+            // 3. OPACITY button
+            int opX = containerX + 34;
+            int opY = containerY + 5;
+            float opacity = card.getOpacity();
+            boolean hoverOp = mouseX >= opX && mouseX < opX + 12 && mouseY >= opY && mouseY < opY + 12;
+            int opBg = hoverOp ? 0x66FFFFFF : 0x22FFFFFF;
+            context.fill(opX, opY, opX + 12, opY + 12, opBg);
+            context.outline(opX, opY, 12, 12, 0x44FFFFFF);
+            // Draw small columns or dots representing transparency level
+            int dotCount = opacity == 1.0f ? 4 : (opacity == 0.75f ? 3 : (opacity == 0.5f ? 2 : 1));
+            for (int d = 0; d < dotCount; d++) {
+                context.fill(opX + 2 + d * 2, opY + 3, opX + 3 + d * 2, opY + 9, 0xFFFFFFFF);
+            }
+        }
+    }
+
+    private int applyOpacity(int color, float opacity) {
+        if (opacity >= 1.0f) return color;
+        int a = (int) (((color >>> 24) & 0xFF) * opacity);
+        return (a << 24) | (color & 0x00FFFFFF);
+    }
+
+    private void drawMainTabsBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float opacity) {
+        for (int i = 0; i < visibleMainTabs.size(); i++) {
+            TabType tab = visibleMainTabs.get(i);
+            int tabX = containerX + containerWidth - 3;
+            int tabY = containerY + 10 + i * 26;
+
+            boolean active = (tab == activeMainTab);
+            boolean hovered = mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22;
+
+            int tabBg = applyOpacity(active ? 0xD9222222 : (hovered ? 0xAA2D2D2D : 0xD9141414), opacity);
+            GuiRenderHelper.drawRoundedBackground(context, tabX, tabY, 27, 22, 6, tabBg);
+            context.outline(tabX, tabY, 27, 22, applyOpacity(active ? 0x66FFFFFF : 0x22FFFFFF, opacity));
+        }
+    }
+
+    private void drawMainTabsIcons(GuiGraphicsExtractor context) {
+        for (int i = 0; i < visibleMainTabs.size(); i++) {
+            TabType tab = visibleMainTabs.get(i);
+            int tabX = containerX + containerWidth - 3;
+            int tabY = containerY + 10 + i * 26;
+
+            ItemStack iconStack = switch (tab) {
+                case DESCRIPTION -> new ItemStack(Items.WRITABLE_BOOK);
+                case CRAFTING -> new ItemStack(Items.CRAFTING_TABLE);
+                case USAGES -> new ItemStack(Items.HOPPER);
+                case LOOT -> new ItemStack(Items.CHEST);
+                case WORLD -> new ItemStack(Items.COMPASS);
+            };
+
+            drawStack(context, iconStack, tabX + 6, tabY + 3);
+        }
+    }
+
+
+    /**
+     * Index du premier onglet affiche, borne a la volee.
+     *
+     * Le bornage est fait ici et non au moment du clic : la liste des
+     * categories change quand on passe de "Fabrication" a "Utilisations", et
+     * elle peut raccourcir. Un decalage devenu trop grand afficherait une
+     * colonne vide sans aucun moyen d'en sortir.
+     */
+
+    /**
+     * Position courante du defilement, en onglets, avec sa partie
+     * fractionnaire.
+     *
+     * categoryScroll est la cible, entiere : c'est elle qui dit quels onglets
+     * sont "visibles". Celle-ci est ce qu'on DESSINE, et elle la rejoint
+     * progressivement. Les deux sont necessaires : confondre la cible et la
+     * position rendrait le clic dependant de l'animation en cours.
+     */
+    private float categoryScrollAnim = 0f;
+    private long categoryScrollNanos = 0L;
+
+    /**
+     * Rapproche la position dessinee de la cible.
+     *
+     * Amortissement exponentiel plutot qu'un pas fixe par image : un pas fixe
+     * defile deux fois plus vite a 120 images par seconde qu'a 60. Ici la
+     * fraction rattrapee depend du temps ecoule, pas du nombre d'images.
+     *
+     * Le delta est plafonne : apres une pause du jeu ou un chargement, un
+     * ecart d'une seconde ferait sauter l'animation d'un coup, ce qui revient
+     * a ne pas en avoir.
+     */
+    private void stepCategoryScroll() {
+        long now = System.nanoTime();
+        float dt = (categoryScrollNanos == 0L) ? 0f
+                : Math.min(0.1f, (now - categoryScrollNanos) / 1_000_000_000f);
+        categoryScrollNanos = now;
+
+        float target = firstVisibleCategory();
+        float delta = target - categoryScrollAnim;
+        if (Math.abs(delta) < 0.002f) {
+            categoryScrollAnim = target;
+            return;
+        }
+        categoryScrollAnim += delta * (1f - (float) Math.exp(-16.0 * dt));
+    }
+
+    /** Ordonnee d'un onglet, animation comprise. */
+    private int categoryTabY(int index) {
+        return categoryTabsTop() + Math.round((index - categoryScrollAnim) * 26f);
+    }
+
+    /**
+     * Premier onglet a DESSINER : un cran avant le premier onglet visible.
+     *
+     * Pendant le glissement un onglet deborde par le haut de la bande. Ne pas
+     * le dessiner ferait apparaitre les onglets d'un coup au lieu de les faire
+     * entrer.
+     */
+    private int categoryDrawFrom() {
+        firstVisibleCategory();   // borne categoryScroll si la liste a raccourci
+        return Math.max(0, (int) Math.floor(categoryScrollAnim) - 1);
+    }
+
+    /** Fin (exclue) de la fenetre dessinee, un cran apres le dernier visible. */
+    private int categoryDrawTo() {
+        return Math.min(categories.size(),
+                (int) Math.ceil(categoryScrollAnim) + MAX_VISIBLE_CATEGORIES + 1);
+    }
+
+    /** Haut de la bande visible. */
+    private int categoryBandTop() {
+        return categoryTabsTop();
+    }
+
+    /** Bas de la bande : exactement six onglets, le dernier compris. */
+    private int categoryBandBottom() {
+        return categoryTabsTop() + (MAX_VISIBLE_CATEGORIES - 1) * 26 + 22;
+    }
+
+    /**
+     * Le curseur est-il sur cet onglet ?
+     *
+     * La zone est rognee par la bande : pendant le glissement un onglet
+     * deborde, et on ne doit pouvoir cliquer que ce qu'on voit.
+     */
+    private boolean categoryTabHit(int tabX, int tabY, double mouseX, double mouseY) {
+        int top = Math.max(tabY, categoryBandTop());
+        int bottom = Math.min(tabY + 22, categoryBandBottom());
+        return bottom > top
+                && mouseX >= tabX && mouseX < tabX + 24
+                && mouseY >= top && mouseY < bottom;
+    }
+
+    /**
+     * Molette sur la colonne d'onglets.
+     *
+     * L'evenement est consomme des que le curseur est sur la colonne, meme si
+     * on est deja en butee : sinon la liste d'items se mettrait a defiler
+     * derriere alors qu'on visait manifestement la colonne.
+     */
+    private boolean categoryWheel(double mouseX, double mouseY, double amount) {
+        if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return false;
+        if (!categoriesScrollable()) return false;
+
+        int x = containerX - 24;
+        if (mouseX < x || mouseX >= x + 27) return false;
+        if (mouseY < categoryScrollUpY()
+                || mouseY >= categoryScrollDownY() + SCROLL_BTN_H) return false;
+
+        int max = Math.max(0, categories.size() - MAX_VISIBLE_CATEGORIES);
+        int step = (amount > 0) ? -1 : (amount < 0 ? 1 : 0);
+        categoryScroll = Math.max(0, Math.min(max, categoryScroll + step));
+        return true;
+    }
+
+    private int firstVisibleCategory() {
+        int max = Math.max(0, categories.size() - MAX_VISIBLE_CATEGORIES);
+        if (categoryScroll > max) categoryScroll = max;
+        if (categoryScroll < 0) categoryScroll = 0;
+        return categoryScroll;
+    }
+
+    /** Index de fin (exclu) de la fenetre affichee. */
+    private int lastVisibleCategory() {
+        return Math.min(categories.size(), firstVisibleCategory() + MAX_VISIBLE_CATEGORIES);
+    }
+
+    /** Y a-t-il assez de categories pour qu'on ait besoin de defiler ? */
+    private boolean categoriesScrollable() {
+        return categories.size() > MAX_VISIBLE_CATEGORIES;
+    }
+
+    /**
+     * Ordonnee du premier onglet.
+     *
+     * Sans fleches, la colonne demarre a la meme hauteur que celle de droite.
+     * Avec fleches, elle descend juste ce qu'il faut pour que celle du haut
+     * tienne dans le cadre : la colonne complete mesure 180 pixels pour un
+     * panneau de 179, elle s'y loge exactement.
+     */
+    private int categoryTabsTop() {
+        return categoriesScrollable() ? containerY + SCROLL_BTN_H + 2 : containerY + 10;
+    }
+
+    private int categoryScrollUpY() {
+        return containerY;
+    }
+
+    /**
+     * Calee sur le bord inferieur du panneau, sauf si celui-ci est trop court
+     * pour les six onglets -- auquel cas elle se contente de passer dessous.
+     */
+    private int categoryScrollDownY() {
+        int belowTabs = categoryTabsTop() + (MAX_VISIBLE_CATEGORIES - 1) * 26 + 24;
+        return Math.max(belowTabs, containerY + containerHeight - SCROLL_BTN_H);
+    }
+
+    private boolean categoryScrollHit(double mouseX, double mouseY, int y) {
+        int x = containerX - 24;
+        return mouseX >= x && mouseX < x + 27 && mouseY >= y && mouseY < y + SCROLL_BTN_H;
+    }
+
+    /** Fleches de defilement de la colonne d'onglets. */
+    private void drawCategoryScrollArrows(GuiGraphicsExtractor context, int mouseX, int mouseY, float opacity) {
+        if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
+        if (!categoriesScrollable()) return;
+
+        if (firstVisibleCategory() > 0) {
+            drawScrollButton(context, categoryScrollUpY(), true, mouseX, mouseY, opacity);
+        }
+        if (lastVisibleCategory() < categories.size()) {
+            drawScrollButton(context, categoryScrollDownY(), false, mouseX, mouseY, opacity);
+        }
+    }
+
+    private void drawScrollButton(GuiGraphicsExtractor context, int y, boolean up, int mouseX, int mouseY, float opacity) {
+        int x = containerX - 24;
+        boolean hovered = mouseX >= x && mouseX < x + 27 && mouseY >= y && mouseY < y + SCROLL_BTN_H;
+
+        GuiRenderHelper.drawRoundedBackground(context, x, y, 27, SCROLL_BTN_H, 4,
+                applyOpacity(hovered ? 0xAA2D2D2D : 0xD9141414, opacity));
+        context.outline(x, y, 27, SCROLL_BTN_H, applyOpacity(hovered ? 0x66FFFFFF : 0x22FFFFFF, opacity));
+
+        // Triangle dessine au pixel : la police ne garantit pas les caracteres
+        // de fleche dans toutes les langues, et un pack de ressources peut les
+        // remplacer par n'importe quoi.
+        int cx = x + 13;
+        int top = y + 4;
+        int tint = applyOpacity(0xFFFFFFFF, opacity);
+        for (int r = 0; r < 4; r++) {
+            int w = up ? (r * 2 + 1) : ((3 - r) * 2 + 1);
+            context.fill(cx - w / 2, top + r, cx + w / 2 + 1, top + r + 1, tint);
+        }
+    }
+
+    private void drawCategoryTabsBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float opacity) {
+        // Une seule fois par image : c'est la premiere des deux
+        // passes de dessin de la colonne.
+        stepCategoryScroll();
+        if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
+
+        int first = categoryDrawFrom();
+        // Ce qui glisse doit etre coupe : pendant l'animation les onglets
+        // qui entrent et sortent depassent de la bande.
+        context.enableScissor(containerX - 24, categoryBandTop(),
+                containerX - 24 + 27, categoryBandBottom());
+        for (int i = first; i < categoryDrawTo(); i++) {
+            RecipeCategory cat = categories.get(i);
+            int tabX = containerX - 24;
+            int tabY = categoryTabY(i);
+
+            boolean active = (cat.equals(activeCategory));
+            boolean hovered = categoryTabHit(tabX, tabY, mouseX, mouseY);
+
+            int tabBg = applyOpacity(active ? 0xD9222222 : (hovered ? 0xAA2D2D2D : 0xD9141414), opacity);
+            GuiRenderHelper.drawRoundedBackground(context, tabX, tabY, 27, 22, 6, tabBg);
+            context.outline(tabX, tabY, 27, 22, applyOpacity(active ? 0x66FFFFFF : 0x22FFFFFF, opacity));
+        }
+
+        context.disableScissor();
+
+        drawCategoryScrollArrows(context, mouseX, mouseY, opacity);
+    }
+
+
+    /**
+     * Dessine une pile AVEC sa quantite.
+     *
+     * item() ne dessine que la texture ; le nombre vient de
+     * itemDecorations(), la meme methode que le jeu utilise pour l'inventaire.
+     * Elle n'ecrit rien quand la quantite vaut 1, ce qui evite d'avoir a
+     * distinguer les cases de recette des icones d'onglet.
+     */
+    private void drawStack(GuiGraphicsExtractor context, ItemStack stack, int x, int y) {
+        if (stack == null || stack.isEmpty()) return;
+        context.item(stack, x, y);
+        context.itemDecorations(net.minecraft.client.Minecraft.getInstance().font, stack, x, y);
+    }
+
+    private void drawCategoryTabsIcons(GuiGraphicsExtractor context) {
+        if (activeMainTab != TabType.CRAFTING && activeMainTab != TabType.USAGES) return;
+
+        int first = categoryDrawFrom();
+        // Ce qui glisse doit etre coupe : pendant l'animation les onglets
+        // qui entrent et sortent depassent de la bande.
+        context.enableScissor(containerX - 24, categoryBandTop(),
+                containerX - 24 + 27, categoryBandBottom());
+        for (int i = first; i < categoryDrawTo(); i++) {
+            RecipeCategory cat = categories.get(i);
+            int tabX = containerX - 24;
+            int tabY = categoryTabY(i);
+
+            ItemStack iconStack = switch (cat.type) {
+                case CRAFTING -> new ItemStack(Items.CRAFTING_TABLE);
+                case SMELTING -> new ItemStack(Items.FURNACE);
+                case BREWING -> new ItemStack(Items.BREWING_STAND);
+                case STONECUTTING -> new ItemStack(Items.STONECUTTER);
+                case SMITHING -> new ItemStack(Items.SMITHING_TABLE);
+                case CUSTOM -> {
+                    boolean useUsages = (activeMainTab == TabType.USAGES);
+                    List<?> list = useUsages ? customUsages : customRecipes;
+                    Recipe<?> matchedRecipe = null;
+                    for (Object recipeObj : list) {
+                        Recipe<?> r = getRecipeFromObj(recipeObj);
+                        if (r != null) {
+                            Identifier typeId = BuiltInRegistries.RECIPE_TYPE.getKey(r.getType());
+                            if (java.util.Objects.equals(typeId, cat.customRecipeTypeId)) {
+                                matchedRecipe = r;
+                                break;
+                            }
+                        }
+                    }
+                    if (matchedRecipe != null) {
+                        yield getMachineIcon(matchedRecipe);
+                    }
+                    yield new ItemStack(Items.DISPENSER);
+                }
+            };
+
+            drawStack(context, iconStack, tabX + 4, tabY + 3);
+        }
+        context.disableScissor();
+    }
+
+    private void drawTabContent(GuiGraphicsExtractor context, int mouseX, int mouseY) {
+        int contentX = containerX + 15;
+        int contentY = containerY + 28;
+        int contentWidth = containerWidth - 30;
+        int contentHeight = containerHeight - 45;
+
+
+        switch (activeMainTab) {
+            case DESCRIPTION: {
+                String desc = ItemDescriptionManager.getInstance().getDescription(targetStack.getItem());
+                if (desc.isEmpty()) {
+                    desc = CeiText.t("cei.info.no_description");
+                }
+
+                // Real stats integration in description tab
+                RecipePopupRenderer.ItemStats stats = new RecipePopupRenderer().getItemStats(targetStack);
+                boolean hasAnyStats = stats.hasDurability || stats.hasFood || stats.hasAttackDamage || stats.hasAttackSpeed || stats.hasArmor || stats.hasToughness;
+
+                int currY = TextRenderHelper.drawWrappedText(context, desc, contentX, contentY, contentWidth, 0xDDFFFFFF, 0.75f, 3, this.font);
+
+                if (hasAnyStats) {
+                    currY += 6;
+                    context.fill(contentX, currY, contentX + contentWidth, currY + 1, 0x22FFFFFF);
+                    currY += 6;
+
+                    String statsTitle = CeiText.t("cei.info.statistics");
+                    context.text(this.font, statsTitle, contentX, currY, 0xFFFFD700, false);
+                    currY += 11;
+
+                    int statColor = 0xAAAAAAAA;
+                    float scale = 0.75f;
+
+                    if (stats.hasAttackDamage) {
+                        String val = String.format("%s: +%.1f", CeiText.t("cei.stat.damage"), stats.attackDamage);
+                        currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
+                    }
+                    if (stats.hasAttackSpeed) {
+                        double speed = 4.0 + stats.attackSpeed;
+                        String val = String.format("%s: %.1f", CeiText.t("cei.stat.attack_speed"), speed);
+                        currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
+                    }
+                    if (stats.hasArmor) {
+                        String val = String.format("%s: +%.0f", CeiText.t("cei.stat.armor"), stats.armor);
+                        currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
+                    }
+                    if (stats.hasToughness) {
+                        String val = String.format("%s: +%.0f", CeiText.t("cei.stat.toughness"), stats.toughness);
+                        currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
+                    }
+                    if (stats.hasFood) {
+                        String val = String.format("%s: +%d (Saturation: +%.1f)", CeiText.t("cei.stat.food"), stats.foodPoints, stats.saturation);
+                        currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
+                    }
+                    if (stats.hasDurability) {
+                        String val = String.format("%s: %d / %d", CeiText.t("cei.stat.durability"), stats.durability, stats.maxDurability);
+                        currY = TextRenderHelper.drawWrappedText(context, val, contentX, currY, contentWidth, statColor, scale, 3, this.font);
+                    }
+                }
+                break;
+            }
+            case CRAFTING:
+            case USAGES: {
+                if (activeCategory == null || getActiveRecipesList().isEmpty()) {
+                    String emptyMsg = CeiText.t(activeMainTab == TabType.CRAFTING
+                            ? "cei.info.no_recipes" : "cei.info.no_usages");
+                    int msgW = this.font.width(emptyMsg);
+                    context.text(this.font, emptyMsg, contentX + (contentWidth - msgW) / 2, contentY + 40, 0xFFFF0000, false);
+                } else {
+                    drawRecipeContent(context, mouseX, mouseY, contentX, contentY, contentWidth, contentHeight);
+                }
+                break;
+            }
+            case LOOT: {
+                List<String> lootSources = LootTableSourceManager.getInstance().getSourcesForItem(targetStack.getItem());
+                String header = CeiText.t("cei.info.obtaining_sources");
+                context.text(this.font, header, contentX, contentY, 0xFFFFD700, false);
+                int currY = contentY + 14;
+
+                for (String source : lootSources) {
+                    currY = TextRenderHelper.drawWrappedText(context, "• " + source, contentX, currY, contentWidth, 0xDDFFFFFF, 0.75f, 6, this.font);
+                }
+                break;
+            }
+            case WORLD: {
+                List<String> locations = new ArrayList<>(LootTableSourceManager.getInstance().getWorldLocationsForItem(targetStack.getItem()));
+
+                // Add natural block generation details!
+                List<String> blockGenSources = BlockGenerationManager.getInstance().getBlockGenerationSources(targetStack.getItem());
+                locations.addAll(blockGenSources);
+
+                // Remove duplicates and placeholders
+                Set<String> uniqueLocs = new LinkedHashSet<>();
+                // Un seul libelle de repli, partage avec LootTableSourceManager.
+                // Avant, deux chaines codees en dur servaient a la fois de
+                // valeur et de filtre : il suffisait qu'une des deux bouge
+                // pour que le doublon reapparaisse a l'ecran.
+                String placeholder = CeiText.t("cei.loot.where.unspecified");
+
+                for (String loc : locations) {
+                    if (!loc.equals(placeholder)) {
+                        uniqueLocs.add(loc);
+                    }
+                }
+
+                if (uniqueLocs.isEmpty()) {
+                    uniqueLocs.add(placeholder);
+                }
+
+                String header = CeiText.t("cei.info.biomes_structures");
+                context.text(this.font, header, contentX, contentY, 0xFFFFD700, false);
+                int currY = contentY + 14;
+
+                for (String location : uniqueLocs) {
+                    currY = TextRenderHelper.drawWrappedText(context, location.startsWith(" ") || location.endsWith(":") ? location : "• " + location, contentX, currY, contentWidth, 0xDDFFFFFF, 0.75f, 6, this.font);
+                }
+                break;
+            }
+        }
+    }
+
+    private void drawRecipeContent(GuiGraphicsExtractor context, int mouseX, int mouseY, int contentX, int contentY, int contentWidth, int contentHeight) {
+        List<?> list = getActiveRecipesList();
+        if (currentPage >= list.size()) currentPage = 0;
+        Object recipeObj = list.get(currentPage);
+
+        var client = Minecraft.getInstance();
+        var rm = client.level.registryAccess();
+        var contextMap = net.minecraft.world.item.crafting.display.SlotDisplayContext.fromLevel(client.level);
+
+        // Draw Header of recipe
+        Recipe<?> activeRecipe = null;
+        if (recipeObj instanceof RecipeHolder<?> entry) {
+            activeRecipe = entry.value();
+        }
+
+        Recipe<?> finalRecipe = activeRecipe;
+        ItemStack titleIcon = switch (activeCategory.type) {
+            case CRAFTING -> new ItemStack(Items.CRAFTING_TABLE);
+            case SMELTING -> new ItemStack(Items.FURNACE);
+            case BREWING -> new ItemStack(Items.BREWING_STAND);
+            case STONECUTTING -> new ItemStack(Items.STONECUTTER);
+            case SMITHING -> new ItemStack(Items.SMITHING_TABLE);
+            case CUSTOM -> finalRecipe != null ? getMachineIcon(finalRecipe) : new ItemStack(Items.DISPENSER);
+        };
+
+        String catName = switch (activeCategory.type) {
+            case CRAFTING -> CeiText.t("cei.station.crafting_table");
+            case SMELTING -> CeiText.t("cei.station.furnace");
+            case BREWING -> CeiText.t("cei.station.brewing_stand");
+            case STONECUTTING -> CeiText.t("cei.station.stonecutter");
+            case SMITHING -> CeiText.t("cei.station.smithing_table");
+            case CUSTOM -> {
+                // Le libelle vient desormais du type de recette lui-meme :
+                // create:crushing doit s'afficher "Crushing Wheel", pas
+                // "Custom Machine". Cf. CeiRecipeStation.
+                if (finalRecipe != null) {
+                    yield getMachineLabel(finalRecipe);
+                }
+                yield CeiText.t("cei.station.custom");
+            }
+        };
+
+        drawStack(context, titleIcon, contentX, contentY - 4);
+        activeSlots.add(new RenderedSlot(titleIcon, contentX, contentY - 4, 16));
+        context.text(this.font, catName, contentX + 20, contentY, 0xFFFFD700, false);
+
+        // Render slots and arrow based on category
+        switch (activeCategory.type) {
+            case CRAFTING: {
+                RecipeHolder<?> entry = (RecipeHolder<?>) recipeObj;
+                Recipe<?> recipe = entry.value();
+                var layout = com.ceketrum.cei.gui.module.cei.recipe.RecipeDisplayHelper.getRecipeLayout(recipe, entry, contextMap);
+
+                int gridStartX = contentX + 10;
+                int gridStartY = contentY + 18;
+
+                // Draw 3x3 slots
+                for (int r = 0; r < 3; r++) {
+                    for (int c = 0; c < 3; c++) {
+                        int slotX = gridStartX + c * 20;
+                        int slotY = gridStartY + r * 20;
+
+                        // Draw slot border & bg
+                        drawSlotBg(context, slotX, slotY);
+
+                        ItemStack inputStack = ItemStack.EMPTY;
+                        if (r < layout.height && c < layout.width) {
+                            inputStack = layout.ingredients[r][c];
+                        }
+
+                        if (inputStack != null && !inputStack.isEmpty()) {
+                            drawStack(context, inputStack, slotX + 1, slotY + 1);
+                            activeSlots.add(new RenderedSlot(inputStack, slotX, slotY, 18));
+                        }
+                    }
+                }
+
+                // Arrow
+                int arrowX = gridStartX + 65;
+                int arrowY = gridStartY + 22;
+                drawArrow(context, arrowX, arrowY);
+
+                // Plus button for crafting table auto-transfer
+                if (isParentCraftingTable()) {
+                    int plusX = arrowX + 3;
+                    int plusY = arrowY + 12;
+
+                    boolean hoverPlus = mouseX >= plusX && mouseX < plusX + 12 && mouseY >= plusY && mouseY < plusY + 12;
+
+                    // Draw sleek button background
+                    int btnBg = hoverPlus ? 0xFF3D3D3D : 0xFF1C1C1C;
+                    int btnBorder = hoverPlus ? 0x88FFFFFF : 0x33FFFFFF;
+
+                    context.fill(plusX, plusY, plusX + 12, plusY + 12, btnBg);
+                    context.outline(plusX, plusY, 12, 12, btnBorder);
+
+                    // Draw horizontal and vertical lines of the "+" sign
+                    int textColor = hoverPlus ? 0xFFFFFFFF : 0xFFAAAAAA;
+                    context.fill(plusX + 3, plusY + 5, plusX + 9, plusY + 7, textColor);
+                    context.fill(plusX + 5, plusY + 3, plusX + 7, plusY + 9, textColor);
+                }
+
+                // Output slot
+                int outputX = gridStartX + 100;
+                int outputY = gridStartY + 18;
+                drawSlotBg(context, outputX, outputY);
+                try {
+                    ItemStack outStack = ItemStack.EMPTY;
+                    List<RecipeDisplay> displays = recipe.display();
+                    if (!displays.isEmpty()) {
+                        outStack = displays.get(0).result().resolveForFirstStack(contextMap);
+                    }
+                    drawStack(context, outStack, outputX + 1, outputY + 1);
+                    activeSlots.add(new RenderedSlot(outStack, outputX, outputY, 18));
+                } catch (Exception e) {}
+                break;
+            }
+            case SMELTING: {
+                RecipeHolder<?> entry = (RecipeHolder<?>) recipeObj;
+                Recipe<?> recipe = entry.value();
+
+                int slotX = contentX + 25;
+                int slotY = contentY + 28;
+
+                // Input slot
+                drawSlotBg(context, slotX, slotY);
+                List<RecipeDisplay> displays = recipe.display();
+                if (!displays.isEmpty() && displays.get(0) instanceof net.minecraft.world.item.crafting.display.FurnaceRecipeDisplay furnace) {
+                    ItemStack inStack = furnace.ingredient().resolveForFirstStack(contextMap);
+                    if (inStack != null && !inStack.isEmpty()) {
+                        drawStack(context, inStack, slotX + 1, slotY + 1);
+                        activeSlots.add(new RenderedSlot(inStack, slotX, slotY, 18));
+                    }
+                }
+
+                // Flame/Arrow
+                drawArrow(context, slotX + 30, slotY + 2);
+
+                // Output slot
+                int outX = slotX + 65;
+                drawSlotBg(context, outX, slotY);
+                try {
+                    ItemStack outStack = ItemStack.EMPTY;
+                    if (!displays.isEmpty()) {
+                        outStack = displays.get(0).result().resolveForFirstStack(contextMap);
+                    }
+                    drawStack(context, outStack, outX + 1, slotY + 1);
+                    activeSlots.add(new RenderedSlot(outStack, outX, slotY, 18));
+                } catch (Exception e) {}
+                break;
+            }
+            case BREWING: {
+                BrewingRecipeManager.BrewingRecipe recipe = (BrewingRecipeManager.BrewingRecipe) recipeObj;
+
+                int gridStartX = contentX + 25;
+                int gridStartY = contentY + 14;
+
+                // Ingredient (top slot)
+                int ingX = gridStartX + 25;
+                int ingY = gridStartY;
+                drawSlotBg(context, ingX, ingY);
+                drawStack(context, recipe.ingredient, ingX + 1, ingY + 1);
+                activeSlots.add(new RenderedSlot(recipe.ingredient, ingX, ingY, 18));
+
+                // Arrow pointing down
+                context.fill(ingX + 8, ingY + 21, ingX + 10, ingY + 36, 0x66FFFFFF);
+                context.fill(ingX + 6, ingY + 33, ingX + 12, ingY + 35, 0x66FFFFFF);
+
+                // Potions (bottom slots)
+                int potY = gridStartY + 40;
+
+                // Input potion (left)
+                int leftX = gridStartX;
+                drawSlotBg(context, leftX, potY);
+                drawStack(context, recipe.inputPotion, leftX + 1, potY + 1);
+                activeSlots.add(new RenderedSlot(recipe.inputPotion, leftX, potY, 18));
+
+                // Output potion (right)
+                int rightX = gridStartX + 50;
+                drawSlotBg(context, rightX, potY);
+                drawStack(context, recipe.outputPotion, rightX + 1, potY + 1);
+                activeSlots.add(new RenderedSlot(recipe.outputPotion, rightX, potY, 18));
+                break;
+            }
+            case STONECUTTING: {
+                RecipeHolder<?> entry = (RecipeHolder<?>) recipeObj;
+                Recipe<?> recipe = entry.value();
+
+                int slotX = contentX + 25;
+                int slotY = contentY + 28;
+
+                // Input
+                drawSlotBg(context, slotX, slotY);
+                List<RecipeDisplay> displays = recipe.display();
+                if (!displays.isEmpty() && displays.get(0) instanceof net.minecraft.world.item.crafting.display.StonecutterRecipeDisplay stonecutter) {
+                    ItemStack inStack = stonecutter.input().resolveForFirstStack(contextMap);
+                    if (inStack != null && !inStack.isEmpty()) {
+                        drawStack(context, inStack, slotX + 1, slotY + 1);
+                        activeSlots.add(new RenderedSlot(inStack, slotX, slotY, 18));
+                    }
+                }
+
+                // Arrow
+                drawArrow(context, slotX + 30, slotY + 2);
+
+                // Output
+                int outX = slotX + 65;
+                drawSlotBg(context, outX, slotY);
+                try {
+                    ItemStack outStack = ItemStack.EMPTY;
+                    if (!displays.isEmpty()) {
+                        outStack = displays.get(0).result().resolveForFirstStack(contextMap);
+                    }
+                    drawStack(context, outStack, outX + 1, slotY + 1);
+                    activeSlots.add(new RenderedSlot(outStack, outX, slotY, 18));
+                } catch (Exception e) {}
+                break;
+            }
+            case SMITHING: {
+                RecipeHolder<?> entry = (RecipeHolder<?>) recipeObj;
+                Recipe<?> recipe = entry.value();
+
+                int slotX = contentX + 10;
+                int slotY = contentY + 28;
+
+                // 3 Inputs (Template, Base, Addition)
+                List<RecipeDisplay> displays = recipe.display();
+                if (!displays.isEmpty() && displays.get(0) instanceof net.minecraft.world.item.crafting.display.SmithingRecipeDisplay smithing) {
+                    List<net.minecraft.world.item.crafting.display.SlotDisplay> slots = List.of(smithing.template(), smithing.base(), smithing.addition());
+                    for (int i = 0; i < 3; i++) {
+                        int sX = slotX + i * 20;
+                        drawSlotBg(context, sX, slotY);
+                        ItemStack match = slots.get(i).resolveForFirstStack(contextMap);
+                        if (match != null && !match.isEmpty()) {
+                            drawStack(context, match, sX + 1, slotY + 1);
+                            activeSlots.add(new RenderedSlot(match, sX, slotY, 18));
+                        }
+                    }
+                }
+
+                // Arrow
+                drawArrow(context, slotX + 65, slotY + 2);
+
+                // Output
+                int outX = slotX + 100;
+                drawSlotBg(context, outX, slotY);
+                try {
+                    ItemStack outStack = ItemStack.EMPTY;
+                    if (!displays.isEmpty()) {
+                        outStack = displays.get(0).result().resolveForFirstStack(contextMap);
+                    }
+                    drawStack(context, outStack, outX + 1, slotY + 1);
+                    activeSlots.add(new RenderedSlot(outStack, outX, slotY, 18));
+                } catch (Exception e) {}
+                break;
+            }
+            case CUSTOM: {
+                RecipeHolder<?> entry = (RecipeHolder<?>) recipeObj;
+                Recipe<?> recipe = entry.value();
+
+                // Nouveau pipeline : la grille vient de la recette elle-meme.
+                // L'ancien code plafonnait a 4 entrees sur une seule ligne
+                // (Math.min(4, totalInputs)), ce qui tronquait toute recette
+                // moddee depassant ce format et en perdait la disposition.
+                var view = com.ceketrum.cei.config.CeiConfig.getInstance().isUseNewRecipeRenderer()
+                        ? com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeAdapter.from(recipe, contextMap)
+                        : null;
+
+                if (view != null) {
+                    long now = System.currentTimeMillis();
+                    int cols = Math.max(1, view.gridWidth());
+                    int rows = Math.max(1, view.gridHeight());
+
+                    List<ItemStack> vOutputs = view.outputs();
+                    if (vOutputs.isEmpty() && activeMainTab == TabType.CRAFTING) {
+                        vOutputs = List.of(targetStack);
+                    }
+                    int displayOut = Math.max(1, Math.min(4, vOutputs.size()));
+
+                    int gridW = cols * 20;
+                    int outW = displayOut * 20;
+                    int totalW = gridW + 24 + outW;
+                    int startX = contentX + (contentWidth - totalW) / 2;
+                    int startY = contentY + 24;
+
+                    for (int r = 0; r < rows; r++) {
+                        for (int c = 0; c < cols; c++) {
+                            int slotX = startX + c * 20;
+                            int slotY = startY + r * 20;
+                            drawSlotBg(context, slotX, slotY);
+                            ItemStack stack = view.slotAt(c, r).current(now);
+                            if (stack != null && !stack.isEmpty()) {
+                                drawStack(context, stack, slotX + 1, slotY + 1);
+                                activeSlots.add(new RenderedSlot(stack, slotX, slotY, 18));
+                            }
+                        }
+                    }
+
+                    int midY = startY + (rows * 20) / 2 - 9;
+                    drawArrow(context, startX + gridW + 3, midY + 2);
+
+                    for (int i = 0; i < displayOut; i++) {
+                        int slotX = startX + gridW + 24 + i * 20;
+                        drawSlotBg(context, slotX, midY);
+                        ItemStack stack = i < vOutputs.size() ? vOutputs.get(i) : ItemStack.EMPTY;
+                        if (stack != null && !stack.isEmpty()) {
+                            drawStack(context, stack, slotX + 1, midY + 1);
+                            activeSlots.add(new RenderedSlot(stack, slotX, midY, 18));
+                        }
+                    }
+                    break;
+                }
+
+                // --- ancien chemin, conserve tant que les deux cohabitent ---
+
+                List<ItemStack> inputs = extractCustomInputs(recipe, contextMap);
+                List<ItemStack> outputs = extractCustomOutputs(recipe, contextMap);
+
+                // Ensure we have at least one input and output to show
+                if (inputs.isEmpty()) {
+                    if (activeMainTab == TabType.USAGES) {
+                        inputs.add(targetStack);
+                    } else {
+                        inputs.add(ItemStack.EMPTY);
+                    }
+                }
+                if (outputs.isEmpty()) {
+                    if (activeMainTab == TabType.CRAFTING) {
+                        outputs.add(targetStack);
+                    } else {
+                        outputs.add(ItemStack.EMPTY);
+                    }
+                }
+
+                int totalInputs = inputs.size();
+                int totalOutputs = outputs.size();
+
+                // Limit to 4 inputs and 4 outputs for single-line horizontal alignment
+                int displayInputs = Math.min(4, totalInputs);
+                int displayOutputs = Math.min(4, totalOutputs);
+
+                int inputsWidth = displayInputs * 20;
+                int outputsWidth = displayOutputs * 20;
+                int totalWidth = inputsWidth + 24 + outputsWidth;
+
+                int startX = contentX + (contentWidth - totalWidth) / 2;
+                int startY = contentY + 24;
+
+                // Draw Inputs
+                for (int i = 0; i < displayInputs; i++) {
+                    int slotX = startX + i * 20;
+                    drawSlotBg(context, slotX, startY);
+                    ItemStack stack = inputs.get(i);
+                    if (stack != null && !stack.isEmpty()) {
+                        drawStack(context, stack, slotX + 1, startY + 1);
+                        activeSlots.add(new RenderedSlot(stack, slotX, startY, 18));
+                    }
+                }
+
+                // Draw Arrow
+                int arrowX = startX + inputsWidth + 3;
+                int arrowY = startY + 2;
+                drawArrow(context, arrowX, arrowY);
+
+                // Draw Outputs
+                for (int i = 0; i < displayOutputs; i++) {
+                    int slotX = startX + inputsWidth + 24 + i * 20;
+                    drawSlotBg(context, slotX, startY);
+                    ItemStack stack = outputs.get(i);
+                    if (stack != null && !stack.isEmpty()) {
+                        drawStack(context, stack, slotX + 1, startY + 1);
+                        activeSlots.add(new RenderedSlot(stack, slotX, startY, 18));
+                    }
+                }
+                break;
+            }
+        }
+
+        // Draw Pagination details
+        int pageY = containerY + containerHeight - 16;
+        String pageStr = String.format("%d / %d", currentPage + 1, getMaxPages());
+        int pageW = this.font.width(pageStr);
+        context.text(this.font, pageStr, contentX + (contentWidth - pageW) / 2, pageY, 0xFF888888, false);
+
+        // Left & Right Arrow buttons
+        int arrowLeftX = contentX + (contentWidth - pageW) / 2 - 15;
+        int arrowRightX = contentX + (contentWidth + pageW) / 2 + 5;
+
+        boolean hoverLeft = mouseX >= arrowLeftX && mouseX < arrowLeftX + 8 && mouseY >= pageY && mouseY < pageY + 9;
+        boolean hoverRight = mouseX >= arrowRightX && mouseX < arrowRightX + 8 && mouseY >= pageY && mouseY < pageY + 9;
+
+        context.text(this.font, "<", arrowLeftX, pageY, hoverLeft ? 0xFFFFFFFF : 0xFF888888, false);
+        context.text(this.font, ">", arrowRightX, pageY, hoverRight ? 0xFFFFFFFF : 0xFF888888, false);
+    }
+
+    private void drawSlotBg(GuiGraphicsExtractor context, int x, int y) {
+        int color = applyOpacity(0xFF181818, this.currentOpacity);
+        context.fill(x, y, x + 18, y + 18, color);
+        context.outline(x, y, 18, 18, applyOpacity(0x33FFFFFF, this.currentOpacity));
+    }
+
+    private void drawArrow(GuiGraphicsExtractor context, int x, int y) {
+        // Render simple elegant horizontal arrow
+        int color = applyOpacity(0x66FFFFFF, this.currentOpacity);
+        context.fill(x, y + 6, x + 18, y + 8, color);
+        context.fill(x + 14, y + 4, x + 15, y + 10, color);
+        context.fill(x + 16, y + 5, x + 17, y + 9, color);
+        context.fill(x + 17, y + 6, x + 18, y + 8, color);
+    }
+
+    private void drawTooltips(GuiGraphicsExtractor context, int mouseX, int mouseY) {
+
+        // 0. Header buttons tooltips
+        var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
+        var card = manager.getPinnedCard(this.targetStack);
+        boolean isPinned = card != null;
+        int pinX = containerX + 6;
+        int pinY = containerY + 5;
+        if (mouseX >= pinX && mouseX < pinX + 12 && mouseY >= pinY && mouseY < pinY + 12) {
+            String tooltipText = isPinned
+                ? (CeiText.t("cei.pin.unpin"))
+                : (CeiText.t("cei.pin.pin"));
+            context.setTooltipForNextFrame(this.font, Component.literal(tooltipText), mouseX, mouseY);
+            return;
+        }
+
+        if (isPinned) {
+            int hudX = containerX + 20;
+            int hudY = containerY + 5;
+            if (mouseX >= hudX && mouseX < hudX + 12 && mouseY >= hudY && mouseY < hudY + 12) {
+                String tooltipText = card.isShowInHud()
+                    ? (CeiText.t("cei.pin.hud_hide"))
+                    : (CeiText.t("cei.pin.hud_show"));
+                context.setTooltipForNextFrame(this.font, Component.literal(tooltipText), mouseX, mouseY);
+                return;
+            }
+
+            int opX = containerX + 34;
+            int opY = containerY + 5;
+            if (mouseX >= opX && mouseX < opX + 12 && mouseY >= opY && mouseY < opY + 12) {
+                String tooltipText = String.format("%s : %d%%",
+                    CeiText.t("cei.pin.opacity"),
+                    (int) (card.getOpacity() * 100)
+                );
+                context.setTooltipForNextFrame(this.font, Component.literal(tooltipText), mouseX, mouseY);
+                return;
+            }
+        }
+
+        // 1. Tooltips for main tabs
+        for (int i = 0; i < visibleMainTabs.size(); i++) {
+            TabType tab = visibleMainTabs.get(i);
+            int tabX = containerX + containerWidth;
+            int tabY = containerY + 10 + i * 26;
+
+            if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
+                String tooltipText = switch (tab) {
+                    case DESCRIPTION -> CeiText.t("cei.tab.description");
+                    case CRAFTING -> CeiText.t("cei.tab.craft");
+                    case USAGES -> CeiText.t("cei.tab.usages");
+                    case LOOT -> CeiText.t("cei.tab.loot");
+                    case WORLD -> CeiText.t("cei.tab.biomes");
+                };
+                context.setTooltipForNextFrame(this.font, Component.literal(tooltipText), mouseX, mouseY);
+                return;
+            }
+        }
+
+        // 2. Tooltips for category tabs
+        if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
+            int first = categoryDrawFrom();
+            for (int i = first; i < categoryDrawTo(); i++) {
+                RecipeCategory cat = categories.get(i);
+                int tabX = containerX - 24;
+                int tabY = categoryTabY(i);
+
+                if (categoryTabHit(tabX, tabY, mouseX, mouseY)) {
+                    String tooltipText = switch (cat.type) {
+                        case CRAFTING -> CeiText.t("cei.station.crafting_table");
+                        case SMELTING -> CeiText.t("cei.cat.smelting");
+                        case BREWING -> CeiText.t("cei.cat.brewing");
+                        case STONECUTTING -> CeiText.t("cei.station.stonecutter");
+                        case SMITHING -> CeiText.t("cei.station.smithing_table");
+                        case CUSTOM -> {
+                            boolean useUsages = (activeMainTab == TabType.USAGES);
+                            List<?> list = useUsages ? customUsages : customRecipes;
+                            Recipe<?> matchedRecipe = null;
+                            for (Object recipeObj : list) {
+                                Recipe<?> r = getRecipeFromObj(recipeObj);
+                                if (r != null) {
+                                    Identifier typeId = BuiltInRegistries.RECIPE_TYPE.getKey(r.getType());
+                                    if (java.util.Objects.equals(typeId, cat.customRecipeTypeId)) {
+                                        matchedRecipe = r;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (matchedRecipe != null) {
+                                yield getMachineLabel(matchedRecipe);
+                            }
+                            yield CeiText.t("cei.cat.custom");
+                        }
+                    };
+                    context.setTooltipForNextFrame(this.font, Component.literal(tooltipText), mouseX, mouseY);
+                    return;
+                }
+            }
+        }
+
+        // 3. Tooltips for hovered slots
+        for (RenderedSlot slot : activeSlots) {
+            if (mouseX >= slot.x && mouseX < slot.x + slot.size && mouseY >= slot.y && mouseY < slot.y + slot.size) {
+                hoveredSlot = slot;
+                context.setTooltipForNextFrame(this.font, slot.stack, mouseX, mouseY);
+                return;
+            }
+        }
+
+        // 4. Tooltip for "+" auto-transfer button
+        if (activeCategory != null && activeCategory.type == CategoryType.CRAFTING && isParentCraftingTable() && !getActiveRecipesList().isEmpty()) {
+            int gridStartX = containerX + 15 + 10;
+            int gridStartY = containerY + 28 + 18;
+            int arrowX = gridStartX + 65;
+            int arrowY = gridStartY + 22;
+            int plusX = arrowX + 3;
+            int plusY = arrowY + 12;
+
+            if (mouseX >= plusX && mouseX < plusX + 12 && mouseY >= plusY && mouseY < plusY + 12) {
+                String title = CeiText.t("cei.craft.fill");
+                String hint = CeiText.t("cei.craft.fill_hint");
+                context.setTooltipForNextFrame(this.font, List.of(
+                    Component.literal(title).withStyle(ChatFormatting.GREEN).getVisualOrderText(),
+                    Component.literal(hint).withStyle(ChatFormatting.GRAY).getVisualOrderText()
+                ), mouseX, mouseY);
+                return;
+            }
+        }
+    }
+
+    private boolean isParentCraftingTable() {
+        if (this.parentScreen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?> handledScreen) {
+            return handledScreen.getMenu() instanceof net.minecraft.world.inventory.CraftingMenu;
+        }
+        return false;
+    }
+
+    public boolean isMouseOverCard(double mouseX, double mouseY) {
+        return mouseX >= (containerX - 24) && mouseX < (containerX + containerWidth + 24) &&
+               mouseY >= containerY && mouseY < (containerY + containerHeight);
+    }
+
+    private void updatePinnedState() {
+        var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
+        var card = manager.getPinnedCard(this.targetStack);
+        if (card != null) {
+            card.setActiveTab(this.activeMainTab);
+            card.setActiveCategory(this.activeCategory);
+            card.setCurrentPage(this.currentPage);
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        com.ceketrum.cei.gui.util.CeiScreenHelper.setShiftDown(event.hasShiftDown());
+        double mouseX = event.x();
+        double mouseY = event.y();
+        int button = event.button();
+
+        if (this.ceiModule != null && this.ceiModule.handleMouseClick(mouseX, mouseY, button, this.width, this.height, this.font)) {
+            return true;
+        }
+
+
+        var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
+        var card = manager.getPinnedCard(this.targetStack);
+        boolean isPinned = card != null;
+
+        // 0. Header buttons click handling
+        int pinX = containerX + 6;
+        int pinY = containerY + 5;
+        if (mouseX >= pinX && mouseX < pinX + 12 && mouseY >= pinY && mouseY < pinY + 12) {
+            if (isPinned) {
+                manager.unpinRecipe(this.targetStack);
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+            } else {
+                manager.pinRecipe(this.targetStack, this.activeMainTab, this.activeCategory, this.currentPage, null);
+
+                // Play click sound
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+
+                // Return to base interface (parent screen) since recipe card is now pinned and rendered as overlay!
+                com.ceketrum.cei.gui.util.CeiScreens.set(this.parentScreen);
+            }
+            return true;
+        }
+
+        if (isPinned) {
+            int hudX = containerX + 20;
+            int hudY = containerY + 5;
+            if (mouseX >= hudX && mouseX < hudX + 12 && mouseY >= hudY && mouseY < hudY + 12) {
+                card.setShowInHud(!card.isShowInHud());
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+
+            int opX = containerX + 34;
+            int opY = containerY + 5;
+            if (mouseX >= opX && mouseX < opX + 12 && mouseY >= opY && mouseY < opY + 12) {
+                card.cycleOpacity();
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+        }
+
+        // Dragging Detection
+        if (mouseX >= containerX && mouseX < containerX + containerWidth && mouseY >= containerY && mouseY < containerY + 20) {
+            if (card != null) {
+                manager.bringToFront(card);
+                card.setDragging(true);
+            }
+            return true;
+        }
+
+        // 0. Check "+" auto-transfer button click
+        if (activeCategory != null && activeCategory.type == CategoryType.CRAFTING && isParentCraftingTable() && !getActiveRecipesList().isEmpty()) {
+            RecipeHolder<?> entry = (RecipeHolder<?>) getActiveRecipesList().get(currentPage);
+            Recipe<?> recipe = entry.value();
+
+            int gridStartX = containerX + 15 + 10;
+            int gridStartY = containerY + 28 + 18;
+            int arrowX = gridStartX + 65;
+            int arrowY = gridStartY + 22;
+            int plusX = arrowX + 3;
+            int plusY = arrowY + 12;
+
+            if (mouseX >= plusX && mouseX < plusX + 12 && mouseY >= plusY && mouseY < plusY + 12) {
+                net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?> handledScreen = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) this.parentScreen;
+                net.minecraft.world.inventory.CraftingMenu craftingHandler = (net.minecraft.world.inventory.CraftingMenu) handledScreen.getMenu();
+
+                int quantity = com.ceketrum.cei.gui.util.CeiScreenHelper.hasShiftDown() ? -1 : 1;
+                if (button == 1) quantity = -1; // Right-click fills maximum
+
+                com.ceketrum.cei.gui.module.cei.util.CraftingHelper.placeRecipeIngredients(
+                    craftingHandler,
+                    recipe,
+                    this.minecraft.level.registryAccess(),
+                    this.minecraft.player,
+                    quantity
+                );
+
+                // Play click sound
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+
+                // Instantly go back to parent screen (crafting table) so they can take the crafted item!
+                com.ceketrum.cei.gui.util.CeiScreens.set(this.parentScreen);
+                return true;
+            }
+        }
+
+        // 1. Check main vertical tabs clicks
+        for (int i = 0; i < visibleMainTabs.size(); i++) {
+            TabType tab = visibleMainTabs.get(i);
+            int tabX = containerX + containerWidth;
+            int tabY = containerY + 10 + i * 26;
+
+            if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
+                activeMainTab = tab;
+                updateCategories();
+                updatePinnedState();
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+        }
+
+        // 2 bis. Fleches de defilement de la colonne d'onglets.
+        //         Testees AVANT les onglets : elles se trouvent juste au-dessus
+        //         et juste en dessous de la colonne, et un clic doit revenir a
+        //         la fleche, pas au premier onglet.
+        if ((activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES)
+                && categoriesScrollable()) {
+            if (firstVisibleCategory() > 0 && categoryScrollHit(mouseX, mouseY, categoryScrollUpY())) {
+                categoryScroll--;
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+            if (lastVisibleCategory() < categories.size()
+                    && categoryScrollHit(mouseX, mouseY, categoryScrollDownY())) {
+                categoryScroll++;
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+        }
+
+        // 2. Check category tabs clicks
+        if (activeMainTab == TabType.CRAFTING || activeMainTab == TabType.USAGES) {
+            int first = categoryDrawFrom();
+            for (int i = first; i < categoryDrawTo(); i++) {
+                RecipeCategory cat = categories.get(i);
+                int tabX = containerX - 24;
+                int tabY = categoryTabY(i);
+
+                if (categoryTabHit(tabX, tabY, mouseX, mouseY)) {
+                    activeCategory = cat;
+                    currentPage = 0;
+                    updatePinnedState();
+                    Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                    return true;
+                }
+            }
+        }
+
+        // 3. Check pagination arrow clicks
+        if (activeCategory != null && !getActiveRecipesList().isEmpty()) {
+            int contentWidth = containerWidth - 30;
+            String pageStr = String.format("%d / %d", currentPage + 1, getMaxPages());
+            int pageW = this.font.width(pageStr);
+            int pageY = containerY + containerHeight - 16;
+
+            int arrowLeftX = containerX + 15 + (contentWidth - pageW) / 2 - 15;
+            int arrowRightX = containerX + 15 + (contentWidth + pageW) / 2 + 5;
+
+            if (mouseX >= arrowLeftX && mouseX < arrowLeftX + 8 && mouseY >= pageY && mouseY < pageY + 9) {
+                currentPage--;
+                if (currentPage < 0) currentPage = getMaxPages() - 1;
+                updatePinnedState();
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+            if (mouseX >= arrowRightX && mouseX < arrowRightX + 8 && mouseY >= pageY && mouseY < pageY + 9) {
+                currentPage++;
+                if (currentPage >= getMaxPages()) currentPage = 0;
+                updatePinnedState();
+                Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                return true;
+            }
+        }
+
+        // 4. Clicked on a recipe slot -> Navigate to that item!
+        if (hoveredSlot != null && (button == 0 || button == 1)) {
+            boolean showUsage = (button == 1);
+            com.ceketrum.cei.gui.util.CeiScreens.set(new CeiItemInfoScreen(this.parentScreen, hoveredSlot.stack, showUsage));
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+            return true;
+        }
+
+        return super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double deltaX, double deltaY) {
+        var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
+        var card = manager.getPinnedCard(this.targetStack);
+        if (card != null && card.isDragging()) {
+            double newXOffset = card.getxOffset() + deltaX;
+            double newYOffset = card.getyOffset() + deltaY;
+
+            // Constrain dragging offsets to the bounds of the window so the recipe card cannot be lost off-screen.
+            double minX = - (double)(this.width - this.containerWidth) / 2;
+            double maxX = (double)(this.width - this.containerWidth) / 2;
+            double minY = - (double)(this.height - this.containerHeight) / 2;
+            double maxY = (double)(this.height - this.containerHeight) / 2;
+
+            card.setxOffset(Math.max(minX, Math.min(maxX, newXOffset)));
+            card.setyOffset(Math.max(minY, Math.min(maxY, newYOffset)));
+            return true;
+        }
+        return super.mouseDragged(event, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+        var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
+        var card = manager.getPinnedCard(this.targetStack);
+        if (card != null && card.isDragging()) {
+            card.setDragging(false);
+            return true;
+        }
+        return super.mouseReleased(event);
+    }
+
+    @Override
+    public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        int keyCode = com.ceketrum.cei.gui.util.CeiInput.key(event);
+        int scanCode = com.ceketrum.cei.gui.util.CeiInput.scancode(event);
+        int modifiers = 0;
+
+        if (this.ceiModule != null && this.ceiModule.getPanelRenderer().getSearchBar().isFocused()) {
+            if (this.ceiModule.handleKeyPress(keyCode, scanCode, modifiers)) {
+                return true;
+            }
+        }
+
+        if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.ESCAPE || this.minecraft.options.keyInventory.matches(event)) {
+            com.ceketrum.cei.gui.util.CeiScreens.set(parentScreen);
+            return true;
+        }
+
+        ItemStack hoverStack = null;
+        if (hoveredSlot != null && !hoveredSlot.stack.isEmpty()) {
+            hoverStack = hoveredSlot.stack;
+        } else if (this.ceiModule != null && this.ceiModule.getHoveredStack() != null) {
+            hoverStack = this.ceiModule.getHoveredStack();
+        }
+
+        if (hoverStack != null && !hoverStack.isEmpty()) {
+            if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.R) { // 'R'
+                com.ceketrum.cei.gui.util.CeiScreens.set(new CeiItemInfoScreen(this.parentScreen, hoverStack, false));
+                return true;
+            }
+            if (keyCode == com.ceketrum.cei.gui.util.CeiKeys.U) { // 'U'
+                com.ceketrum.cei.gui.util.CeiScreens.set(new CeiItemInfoScreen(this.parentScreen, hoverStack, true));
+                return true;
+            }
+        }
+
+        return super.keyPressed(event);
+    }
+
+    @Override
+    public boolean charTyped(net.minecraft.client.input.CharacterEvent event) {
+        char chr = (char) event.codepoint();
+        int modifiers = 0;
+        if (this.ceiModule != null && this.ceiModule.handleCharTyped(chr, modifiers)) {
+            return true;
+        }
+        return super.charTyped(event);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (categoryWheel(mouseX, mouseY, verticalAmount)) return true;
+        if (this.ceiModule != null) {
+            float animationSlideOffset = this.ceiModule.getPanelRenderer().getAnimationSlideOffset();
+            if (this.ceiModule.handleMouseScroll(mouseX, mouseY, verticalAmount, this.width, this.height, this.font, animationSlideOffset)) {
+                return true;
+            }
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
+    public boolean isPauseScreen() {
+        return false;
+    }
+
+    public static List<ItemStack> extractCustomOutputs(Recipe<?> recipe, net.minecraft.util.context.ContextMap contextMap) {
+        List<ItemStack> list = new ArrayList<>();
+        var rm = Minecraft.getInstance().level.registryAccess();
+
+        // 1. Try RecipeDisplay result
+        try {
+            for (var display : recipe.display()) {
+                ItemStack result = display.result().resolveForFirstStack(contextMap);
+                if (result != null && !result.isEmpty()) {
+                    list.add(result.copy());
+                }
+            }
+        } catch (Exception e) {}
+
+        // 2. Reflectively search for outputs/results methods and fields
+        Class<?> clazz = recipe.getClass();
+        List<String> methodNames = List.of(
+            "getOutputs", "getOutputsList", "getResults", "getRecipeOutputs",
+            "getOutput", "getResult", "getOutputItems", "getResultsList"
+        );
+
+        for (String methodName : methodNames) {
+            try {
+                Method method;
+                Object resultObj = null;
+                try {
+                    method = clazz.getMethod(methodName, net.minecraft.core.RegistryAccess.class);
+                    resultObj = method.invoke(recipe, rm);
+                } catch (NoSuchMethodException e) {
+                    try {
+                        method = clazz.getMethod(methodName, net.minecraft.core.HolderLookup.Provider.class);
+                        resultObj = method.invoke(recipe, rm);
+                    } catch (NoSuchMethodException e2) {
+                        try {
+                            method = clazz.getMethod(methodName);
+                            resultObj = method.invoke(recipe);
+                        } catch (Exception e3) {}
+                    }
+                }
+
+                if (resultObj != null) {
+                    unpackOutputObject(resultObj, list);
+                }
+            } catch (Exception e) {}
+        }
+
+        // Search fields if list is still empty or to find secondary outputs
+        List<String> fieldNames = List.of(
+            "outputs", "results", "output", "result", "outputItems",
+            "recipeOutputs", "outputItem", "resultItem"
+        );
+
+        for (String fieldName : fieldNames) {
+            try {
+                Field field = clazz.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object val = field.get(recipe);
+                if (val != null) {
+                    unpackOutputObject(val, list);
+                }
+            } catch (Exception e) {}
+        }
+
+        // Remove duplicates and empty stacks
+        List<ItemStack> cleanList = new ArrayList<>();
+        Set<String> keys = new HashSet<>();
+        for (ItemStack stack : list) {
+            if (stack != null && !stack.isEmpty()) {
+                String key = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString() + ":" + stack.getCount();
+                if (keys.add(key)) {
+                    cleanList.add(stack);
+                }
+            }
+        }
+
+        return cleanList;
+    }
+
+    private static void unpackOutputObject(Object obj, List<ItemStack> list) {
+        unpackOutputObject(obj, list, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()), 0);
+    }
+
+    private static void unpackOutputObject(Object obj, List<ItemStack> list, Set<Object> visited, int depth) {
+        if (obj == null || depth > 8 || !visited.add(obj)) return;
+
+        if (obj instanceof ItemStack stack) {
+            if (!stack.isEmpty()) {
+                list.add(stack.copy());
+            }
+            return;
+        }
+
+        if (obj instanceof Block block) {
+            list.add(new ItemStack(block));
+            return;
+        }
+
+        if (obj instanceof Item item) {
+            list.add(new ItemStack(item));
+            return;
+        }
+
+        if (obj instanceof net.minecraft.world.item.crafting.Ingredient ing) {
+            java.util.List<ItemStack> matches = ing.items().map(h -> new ItemStack(h.value())).toList();
+            for (ItemStack match : matches) {
+                if (match != null && !match.isEmpty()) {
+                    list.add(match.copy());
+                }
+            }
+            return;
+        }
+
+        if (obj instanceof Collection<?> col) {
+            for (Object el : col) {
+                unpackOutputObject(el, list, visited, depth + 1);
+            }
+            return;
+        }
+
+        if (obj.getClass().isArray()) {
+            int length = java.lang.reflect.Array.getLength(obj);
+            for (int i = 0; i < length; i++) {
+                unpackOutputObject(java.lang.reflect.Array.get(obj, i), list, visited, depth + 1);
+            }
+            return;
+        }
+
+        if (obj instanceof java.util.Optional<?> opt) {
+            if (opt.isPresent()) {
+                unpackOutputObject(opt.get(), list, visited, depth + 1);
+            }
+            return;
+        }
+
+        // Avoid reflecting on engine / framework classes to prevent traversing server/client state
+        String className = obj.getClass().getName();
+        if (className.startsWith("java.") || className.startsWith("javax.") || className.startsWith("sun.") || className.startsWith("com.sun.") ||
+            className.startsWith("net.minecraft.") || className.startsWith("com.mojang.") || className.startsWith("com.google.") ||
+            className.startsWith("io.netty.") || className.startsWith("org.lwjgl.")) {
+            return;
+        }
+
+        // Reflectively search the object's methods and fields
+        Class<?> clazz = obj.getClass();
+        while (clazz != null && clazz != Object.class) {
+            // Fields
+            for (Field f : clazz.getDeclaredFields()) {
+                try {
+                    f.setAccessible(true);
+                    Object val = f.get(obj);
+                    if (val != null) {
+                        unpackOutputObject(val, list, visited, depth + 1);
+                    }
+                } catch (Exception e) {}
+            }
+
+            // Methods - only invoke zero-arg getters that sound like output getters
+            for (Method m : clazz.getDeclaredMethods()) {
+                if (m.getParameterCount() == 0 && !m.getReturnType().equals(Void.TYPE)
+                        && cei$mayHoldItems(m.getReturnType())) {
+                    String mName = m.getName().toLowerCase();
+                    if (mName.contains("result") || mName.contains("output") || mName.contains("item") ||
+                        mName.contains("stack") || mName.contains("ingredient") || mName.contains("recipe") ||
+                        mName.contains("icon") || mName.contains("value") || mName.contains("display")) {
+                        try {
+                            m.setAccessible(true);
+                            Object val = m.invoke(obj);
+                            if (val != null) {
+                                unpackOutputObject(val, list, visited, depth + 1);
+                            }
+                        } catch (Exception e) {}
+                    }
+                }
+            }
+            clazz = clazz.getSuperclass();
+        }
+    }
+
+    public static List<ItemStack> extractCustomInputs(Recipe<?> recipe, net.minecraft.util.context.ContextMap contextMap) {
+        List<ItemStack> list = new ArrayList<>();
+
+        // 1. Try RecipeDisplay ingredients
+        try {
+            for (var display : recipe.display()) {
+                for (var inputSlot : getRecipeIngredients(display)) {
+                    if (inputSlot != null) {
+                        List<ItemStack> stacks = inputSlot.resolveForStacks(contextMap);
+                        if (!stacks.isEmpty()) {
+                            list.add(stacks.get(0).copy());
+                        } else {
+                            list.add(ItemStack.EMPTY);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {}
+
+        // If we only have empty stacks, clear it so we can try custom extraction
+        if (list.stream().allMatch(ItemStack::isEmpty)) {
+            list.clear();
+        }
+
+        // 2. Reflectively search for inputs/ingredients methods and fields
+        Class<?> clazz = recipe.getClass();
+        List<String> methodNames = List.of(
+            "getInputs", "getIngredients", "getRecipeInputs", "getInput", "getInputItems"
+        );
+
+        for (String methodName : methodNames) {
+            try {
+                Method method = clazz.getMethod(methodName);
+                Object resultObj = method.invoke(recipe);
+                if (resultObj != null) {
+                    unpackInputObject(resultObj, list);
+                }
+            } catch (Exception e) {}
+        }
+
+        List<String> fieldNames = List.of(
+            "ingredients", "inputs", "input", "recipeInputs", "inputItems"
+        );
+
+        for (String fieldName : fieldNames) {
+            try {
+                Field field = clazz.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object val = field.get(recipe);
+                if (val != null) {
+                    unpackInputObject(val, list);
+                }
+            } catch (Exception e) {}
+        }
+
+        // Remove empty stacks and duplicates
+        List<ItemStack> cleanList = new ArrayList<>();
+        Set<String> keys = new HashSet<>();
+        for (ItemStack stack : list) {
+            if (stack != null && !stack.isEmpty()) {
+                String key = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString() + ":" + stack.getCount();
+                if (keys.add(key)) {
+                    cleanList.add(stack);
+                }
+            }
+        }
+
+        return cleanList;
+    }
+
+    private static void unpackInputObject(Object obj, List<ItemStack> list) {
+        unpackInputObject(obj, list, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()), 0);
+    }
+
+    /** Profondeur maximale d'exploration du graphe d'objets. */
+    private static final int CEI_UNPACK_MAX_DEPTH = 8;
+    /** Nombre maximal d'objets visites, filet de securite global. */
+    private static final int CEI_UNPACK_MAX_VISITED = 2000;
+
+    private static void unpackInputObject(Object obj, List<ItemStack> list, Set<Object> visited, int depth) {
+        // Le set `visited` ne suffit PAS a garantir la terminaison : les methodes
+        // sans argument du type stream() / iterator() / copy() renvoient un objet
+        // NEUF a chaque appel, donc visited.add() reussit toujours. Sans ces
+        // bornes, l'exploration part en StackOverflowError (constate sur 26.3).
+        if (obj == null) return;
+        if (depth > CEI_UNPACK_MAX_DEPTH) return;
+        if (visited.size() > CEI_UNPACK_MAX_VISITED) return;
+        if (!visited.add(obj)) return;
+
+        if (obj instanceof net.minecraft.world.item.crafting.Ingredient ing) {
+            java.util.List<ItemStack> matches = ing.items().map(h -> new ItemStack(h.value())).toList();
+            for (ItemStack match : matches) {
+                if (match != null && !match.isEmpty()) {
+                    list.add(match.copy());
+                }
+            }
+            return;
+        }
+
+        if (obj instanceof ItemStack stack) {
+            if (!stack.isEmpty()) {
+                list.add(stack.copy());
+            }
+            return;
+        }
+
+        if (obj instanceof Block block) {
+            list.add(new ItemStack(block));
+            return;
+        }
+
+        if (obj instanceof Item item) {
+            list.add(new ItemStack(item));
+            return;
+        }
+
+        if (obj instanceof Collection<?> col) {
+            for (Object el : col) {
+                unpackInputObject(el, list, visited, depth + 1);
+            }
+            return;
+        }
+
+        if (obj.getClass().isArray()) {
+            int length = java.lang.reflect.Array.getLength(obj);
+            for (int i = 0; i < length; i++) {
+                unpackInputObject(java.lang.reflect.Array.get(obj, i), list, visited, depth + 1);
+            }
+            return;
+        }
+
+        if (obj instanceof java.util.Optional<?> opt) {
+            if (opt.isPresent()) {
+                unpackInputObject(opt.get(), list, visited, depth + 1);
+            }
+            return;
+        }
+
+        // Avoid reflecting on typical standard library / minecraft / game classes that aren't custom recipe objects
+        String className = obj.getClass().getName();
+        if (className.startsWith("java.") || className.startsWith("javax.") || className.startsWith("sun.") || className.startsWith("com.sun.") ||
+            className.startsWith("net.minecraft.registry.") || className.startsWith("net.minecraft.class_") ||
+            className.equals("net.minecraft.recipe.RecipeEntry") || className.startsWith("com.google.gson.") ||
+            className.startsWith("com.mojang.datafixers.") || className.startsWith("com.mojang.serialization.")) {
+            return;
+        }
+
+        // Reflectively search the object's methods and fields
+        Class<?> clazz = obj.getClass();
+        while (clazz != null && clazz != Object.class) {
+            // Fields
+            for (Field f : clazz.getDeclaredFields()) {
+                try {
+                    f.setAccessible(true);
+                    Object val = f.get(obj);
+                    if (val != null) {
+                        unpackInputObject(val, list, visited, depth + 1);
+                    }
+                } catch (Exception e) {}
+            }
+
+            // Methods
+            for (Method m : clazz.getDeclaredMethods()) {
+                if (m.getParameterCount() == 0 && !m.getReturnType().equals(Void.TYPE)
+                        && cei$mayHoldItems(m.getReturnType())) {
+                    // Filter out standard Object methods and dangerous methods
+                    String mName = m.getName();
+                    if (mName.equals("toString") || mName.equals("hashCode") || mName.equals("getClass") ||
+                        mName.equals("clone") || mName.equals("notify") || mName.equals("notifyAll")) {
+                        continue;
+                    }
+
+                    try {
+                        m.setAccessible(true);
+                        Object val = m.invoke(obj);
+                        if (val != null) {
+                            unpackInputObject(val, list, visited, depth + 1);
+                        }
+                    } catch (Exception e) {}
+                }
+            }
+            clazz = clazz.getSuperclass();
+        }
+    }
+
+    /**
+     * N'invoque par reflexion que les accesseurs susceptibles de contenir des
+     * items. Sans ce filtre, on appelle stream(), iterator(), entrySet()... qui
+     * allouent un objet neuf a chaque fois et rendent l'exploration infinie.
+     */
+    private static boolean cei$mayHoldItems(Class<?> t) {
+        if (t.isArray()) return cei$mayHoldItems(t.getComponentType());
+        return ItemStack.class.isAssignableFrom(t)
+            || net.minecraft.world.item.crafting.Ingredient.class.isAssignableFrom(t)
+            || Item.class.isAssignableFrom(t)
+            || Block.class.isAssignableFrom(t)
+            || Collection.class.isAssignableFrom(t)
+            || java.util.Optional.class.isAssignableFrom(t);
+    }
+
+    /**
+     * Libelle de la station de travail d'une recette moddee.
+     *
+     * L'ancien comportement affichait "Custom Machine" des que l'icone retombait
+     * sur le distributeur, c'est-a-dire pour la quasi-totalite des recettes
+     * moddees. On passe ici par CeiRecipeStation, qui derive un nom du type de
+     * recette (create:crushing -> "Crushing Wheel", a defaut "Crushing").
+     */
+    private String getMachineLabel(Recipe<?> recipe) {
+        if (recipe == null) return CeiText.t("cei.station.custom");
+        ItemStack icon = getMachineIcon(recipe);
+        if (icon != null && !icon.isEmpty() && icon.getItem() != Items.DISPENSER) {
+            String name = icon.getHoverName().getString();
+            if (name != null && !name.isBlank()) return name;
+        }
+        Identifier typeId = null;
+        try {
+            typeId = BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType());
+        } catch (Exception e) {
+            // type non enregistre : on laisse CeiRecipeStation gerer le null
+        }
+        return com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation.labelFor(typeId);
+    }
+
+    /**
+     * Memorisation des icones de machine.
+     *
+     * getMachineIconUncached finit par balayer tout le registre des items dans
+     * son dernier repli. Sans cache, ce balayage avait lieu a CHAQUE frame et
+     * pour chaque onglet de categorie affiche -- un cout invisible en vanilla,
+     * net sur un gros pack modde. La cle est le type de recette : deux recettes
+     * du meme type donnent la meme icone.
+     */
+    private static final java.util.Map<Identifier, ItemStack> MACHINE_ICON_CACHE = new java.util.HashMap<>();
+
+    private ItemStack getMachineIcon(Recipe<?> recipe) {
+        if (recipe == null) return new ItemStack(Items.DISPENSER);
+        Identifier typeId = null;
+        try {
+            typeId = BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType());
+        } catch (Exception e) {
+            // type non enregistre : on ne memorise pas, on calcule a chaque fois
+        }
+        if (typeId == null) return getMachineIconUncached(recipe);
+        ItemStack cached = MACHINE_ICON_CACHE.get(typeId);
+        if (cached == null) {
+            cached = getMachineIconUncached(recipe);
+            MACHINE_ICON_CACHE.put(typeId, cached);
+        }
+        return cached.copy();
+    }
+
+    private ItemStack getMachineIconUncached(Recipe<?> recipe) {
+        var client = Minecraft.getInstance();
+        if (client.level == null) return new ItemStack(Items.DISPENSER);
+
+        try {
+            Identifier typeId = BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType());
+            Identifier serializerId = BuiltInRegistries.RECIPE_SERIALIZER.getKey(recipe.getSerializer());
+
+            String namespace = null;
+            String typePath = null;
+            String serPath = null;
+
+            // Try to get type path
+            if (typeId != null) {
+                namespace = typeId.getNamespace();
+                typePath = typeId.getPath();
+            } else if (recipe.getType() != null) {
+                String s = recipe.getType().toString();
+                if (s.contains(":")) {
+                    String[] parts = s.split(":");
+                    namespace = parts[0];
+                    typePath = parts[1];
+                } else {
+                    typePath = s;
+                }
+            }
+
+            // Try to get serializer path
+            if (serializerId != null) {
+                if (namespace == null) namespace = serializerId.getNamespace();
+                serPath = serializerId.getPath();
+            } else if (recipe.getSerializer() != null) {
+                String s = recipe.getSerializer().toString();
+                if (s.contains(":")) {
+                    String[] parts = s.split(":");
+                    if (namespace == null) namespace = parts[0];
+                    serPath = parts[1];
+                } else {
+                    serPath = s;
+                }
+            }
+
+            String className = recipe.getClass().getSimpleName();
+            if (namespace == null || namespace.equals("minecraft")) {
+                String fullClass = recipe.getClass().getName().toLowerCase();
+                if (fullClass.contains("oritech")) namespace = "oritech";
+                else if (fullClass.contains("techreborn")) namespace = "techreborn";
+                else if (fullClass.contains("modern_industrialization") || fullClass.contains("modernindustrialization")) namespace = "modern_industrialization";
+                else if (fullClass.contains("pokedna")) namespace = "pokedna";
+                else if (fullClass.contains("ecliptea")) namespace = "ecliptea";
+            }
+
+            if (typePath == null || typePath.contains(".") || typePath.contains("@")) {
+                typePath = className.toLowerCase();
+                if (typePath.endsWith("recipe")) {
+                    typePath = typePath.substring(0, typePath.length() - 6);
+                }
+            }
+
+            if (serPath == null || serPath.contains(".") || serPath.contains("@")) {
+                serPath = className.toLowerCase();
+                if (serPath.endsWith("recipe")) {
+                    serPath = serPath.substring(0, serPath.length() - 6);
+                }
+            }
+
+            // 2. Direct lookup fallbacks using solved namespace and path
+            if (typePath != null && namespace != null) {
+                Item item = getItem(namespace, typePath);
+                if (item != null && item != Items.AIR) return new ItemStack(item);
+
+                Item blockItem = getItem(namespace, typePath + "_block");
+                if (blockItem != null && blockItem != Items.AIR) return new ItemStack(blockItem);
+
+                Item machineItem = getItem(namespace, typePath + "_machine");
+                if (machineItem != null && machineItem != Items.AIR) return new ItemStack(machineItem);
+
+                String path = typePath;
+                if (path.endsWith("_recipe")) {
+                    path = path.substring(0, path.length() - 7);
+                    Item fallback = getItem(namespace, path);
+                    if (fallback != null && fallback != Items.AIR) return new ItemStack(fallback);
+
+                    Item fallbackBlock = getItem(namespace, path + "_block");
+                    if (fallbackBlock != null && fallbackBlock != Items.AIR) return new ItemStack(fallbackBlock);
+                }
+            }
+
+            if (serPath != null && namespace != null) {
+                Item item = getItem(namespace, serPath);
+                if (item != null && item != Items.AIR) return new ItemStack(item);
+
+                Item blockItem = getItem(namespace, serPath + "_block");
+                if (blockItem != null && blockItem != Items.AIR) return new ItemStack(blockItem);
+
+                Item machineItem = getItem(namespace, serPath + "_machine");
+                if (machineItem != null && machineItem != Items.AIR) return new ItemStack(machineItem);
+
+                String path = serPath;
+                if (path.endsWith("_serializer")) {
+                    path = path.substring(0, path.length() - 11);
+                } else if (path.endsWith("_recipe")) {
+                    path = path.substring(0, path.length() - 7);
+                }
+                Item fallback = getItem(namespace, path);
+                if (fallback != null && fallback != Items.AIR) return new ItemStack(fallback);
+
+                Item fallbackBlock = getItem(namespace, path + "_block");
+                if (fallbackBlock != null && fallbackBlock != Items.AIR) return new ItemStack(fallbackBlock);
+            }
+
+            // 1.21.5+ : la recette porte elle-meme sa station de travail.
+            ItemStack declared = com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation
+                    .fromDisplay(recipe);
+            if (!declared.isEmpty()) return declared;
+
+            // Repli generique fonde sur l'identifiant du type de recette :
+            // create:crushing -> create:crushing_wheel. Aucune connaissance
+            // specifique a un mod, et le resultat est memorise. Place AVANT la
+            // recherche floue ci-dessous, qui compare des sous-chaines de noms
+            // de classe et peut renvoyer a peu pres n'importe quel item.
+            ItemStack station = com.ceketrum.cei.gui.module.cei.recipe.view.CeiRecipeStation
+                    .iconFor(BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType()));
+            if (!station.isEmpty()) return station;
+
+            // La table de mots-cles, DERNIER recours avant la recherche floue.
+            // Elle raisonne par sous-chaine : "industrial_grinder" contient
+            // "grinder", donc elle ramenait le broyeur industriel sur l'item du
+            // broyeur simple. Elle ne doit intervenir que si l'identifiant n'a
+            // rien donne.
+            if (typePath != null) {
+                ItemStack match = findMachineItem(typePath, namespace);
+                if (match != null) return match;
+            }
+            if (serPath != null) {
+                ItemStack match = findMachineItem(serPath, namespace);
+                if (match != null) return match;
+            }
+            ItemStack classMatch = findMachineItem(className, namespace);
+            if (classMatch != null) return classMatch;
+
+            // 3. Fuzzy search in same namespace
+            if (namespace != null) {
+                for (Identifier id : BuiltInRegistries.ITEM.keySet()) {
+                    if (id.getNamespace().equals(namespace)) {
+                        String itemPath = id.getPath().toLowerCase();
+                        if (className.toLowerCase().contains(itemPath) || itemPath.contains(className.toLowerCase())) {
+                            return new ItemStack(getItem(id));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {}
+
+        return new ItemStack(Items.DISPENSER);
+    }
+
+    private Recipe<?> getRecipeFromObj(Object obj) {
+        if (obj == null) return null;
+        if (obj instanceof RecipeHolder<?> entry) {
+            return entry.value();
+        }
+        if (obj instanceof Recipe<?> r) {
+            return r;
+        }
+        try {
+            for (Method m : obj.getClass().getMethods()) {
+                if (m.getParameterCount() == 0 && Recipe.class.isAssignableFrom(m.getReturnType())) {
+                    return (Recipe<?>) m.invoke(obj);
+                }
+            }
+            for (Field f : obj.getClass().getDeclaredFields()) {
+                if (Recipe.class.isAssignableFrom(f.getType())) {
+                    f.setAccessible(true);
+                    return (Recipe<?>) f.get(obj);
+                }
+            }
+        } catch (Exception e) {}
+        return null;
+    }
+
+    private Item getItem(Identifier id) {
+        return BuiltInRegistries.ITEM.get(id).map(net.minecraft.core.Holder::value).orElse(Items.AIR);
+    }
+
+    private Item getItem(String namespace, String path) {
+        return BuiltInRegistries.ITEM.get(Identifier.fromNamespaceAndPath(namespace, path)).map(net.minecraft.core.Holder::value).orElse(Items.AIR);
+    }
+
+    private ItemStack findMachineItem(String searchStr, String namespace) {
+        if (searchStr == null) return null;
+        String s = searchStr.toLowerCase();
+
+        // Custom Oritech Mappings
+        if (namespace != null && namespace.equals("oritech")) {
+            String path = null;
+            if (s.contains("assembly") || s.contains("assembler")) {
+                path = "assembler_block";
+            } else if (s.contains("grinder")) {
+                path = "fragment_forge_block";
+            } else if (s.contains("pulverizer")) {
+                path = "pulverizer_block";
+            } else if (s.contains("centrifuge")) {
+                path = "centrifuge_block";
+            } else if (s.contains("foundry")) {
+                path = "foundry_block";
+            } else if (s.contains("furnace")) {
+                path = "powered_furnace_block";
+            } else if (s.contains("forge") || s.contains("atomic")) {
+                path = "atomic_forge_block";
+            } else if (s.contains("refinery")) {
+                path = "refinery_block";
+            }
+
+            if (path != null) {
+                var item = getItem("oritech", path);
+                if (item != null && item != Items.AIR) return new ItemStack(item);
+            }
+        }
+
+        String path = null;
+        if (s.contains("assembly") || s.contains("assembler")) {
+            path = "assembly_machine";
+        } else if (s.contains("grinder") || s.contains("macerator")) {
+            path = "grinder";
+        } else if (s.contains("compressor") || s.contains("press")) {
+            path = "compressor";
+        } else if (s.contains("centrifuge")) {
+            path = "industrial_centrifuge";
+        } else if (s.contains("extractor")) {
+            path = "extractor";
+        } else if (s.contains("blast_furnace") || s.contains("blastfurnace")) {
+            path = "industrial_blast_furnace";
+        } else if (s.contains("chemical") || s.contains("reactor")) {
+            path = "chemical_reactor";
+        } else if (s.contains("electrolyzer")) {
+            path = "industrial_electrolyzer";
+        } else if (s.contains("distillation") || s.contains("distill")) {
+            path = "distillation_tower";
+        } else if (s.contains("sawmill")) {
+            path = "industrial_sawmill";
+        } else if (s.contains("implosion")) {
+            path = "implosion_compressor";
+        } else if (s.contains("rolling")) {
+            path = "rolling_machine";
+        } else if (s.contains("canner") || s.contains("canning")) {
+            path = "canning_machine";
+        } else if (s.contains("alloy")) {
+            path = "alloy_smelter";
+        } else if (s.contains("foundry")) {
+            path = "foundry_block";
+        }
+
+        if (path != null) {
+            if (namespace != null && !namespace.isEmpty() && !namespace.equals("minecraft")) {
+                var item = getItem(namespace, path);
+                if (item != null && item != Items.AIR) return new ItemStack(item);
+
+                if (namespace.equals("modern_industrialization")) {
+                    String miPath = path;
+                    if (path.equals("assembly_machine")) miPath = "assembler";
+                    else if (path.equals("grinder")) miPath = "macerator";
+                    var miItem = getItem(namespace, miPath);
+                    if (miItem != null && miItem != Items.AIR) return new ItemStack(miItem);
+                }
+            }
+
+            for (String ns : List.of("techreborn", "modern_industrialization", "minecraft")) {
+                var item = getItem(ns, path);
+                if (item != null && item != Items.AIR) return new ItemStack(item);
+
+                if (ns.equals("modern_industrialization")) {
+                    String miPath = path;
+                    if (path.equals("assembly_machine")) miPath = "assembler";
+                    else if (path.equals("grinder")) miPath = "macerator";
+                    var miItem = getItem(ns, miPath);
+                    if (miItem != null && miItem != Items.AIR) return new ItemStack(miItem);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public static List<net.minecraft.world.item.crafting.display.SlotDisplay> getRecipeIngredients(net.minecraft.world.item.crafting.display.RecipeDisplay display) {
+        if (display instanceof net.minecraft.world.item.crafting.display.ShapedCraftingRecipeDisplay shaped) {
+            return shaped.ingredients();
+        } else if (display instanceof net.minecraft.world.item.crafting.display.ShapelessCraftingRecipeDisplay shapeless) {
+            return shapeless.ingredients();
+        } else if (display instanceof net.minecraft.world.item.crafting.display.FurnaceRecipeDisplay furnace) {
+            return List.of(furnace.ingredient());
+        } else if (display instanceof net.minecraft.world.item.crafting.display.StonecutterRecipeDisplay stonecutter) {
+            return List.of(stonecutter.input());
+        } else if (display instanceof net.minecraft.world.item.crafting.display.SmithingRecipeDisplay smithing) {
+            return List.of(smithing.template(), smithing.base(), smithing.addition());
+        }
+        return List.of();
+    }
+}

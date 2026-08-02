@@ -1,0 +1,86 @@
+package com.ceketrum.cei;
+
+import com.ceketrum.cei.config.CeiConfig;
+import com.ceketrum.cei.data.FavoriteItemsManager;
+import com.ceketrum.cei.data.ItemDescriptionManager;
+import com.ceketrum.cei.data.BrewingRecipeManager;
+import com.ceketrum.cei.data.LootTableSourceManager;
+
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.RegisterGuiOverlaysEvent;
+import net.neoforged.neoforge.client.gui.overlay.VanillaGuiOverlay;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.DrawContext;
+
+@Mod("cei")
+public class CEINeoForge {
+    public CEINeoForge(IEventBus modEventBus) {
+        // Register mod bus event subscribers
+        modEventBus.register(ClientSetup.class);
+        
+        // Register game bus event subscribers
+        NeoForge.EVENT_BUS.register(GameplayEvents.class);
+    }
+
+    public static class ClientSetup {
+        @SubscribeEvent
+        public static void onClientSetup(FMLClientSetupEvent event) {
+            event.enqueueWork(() -> {
+                // Initialize client-side config & managers
+                ItemDescriptionManager.getInstance().loadCurrentLanguageDescriptions();
+                CeiConfig.getInstance().load();
+                FavoriteItemsManager.getInstance().load();
+            });
+        }
+
+        @SubscribeEvent
+        public static void registerGuiOverlays(RegisterGuiOverlaysEvent event) {
+            event.registerAbove(VanillaGuiOverlay.HOTBAR.id(), new Identifier("cei", "hud"), (gui, drawContext, partialTick, width, height) -> {
+                var client = MinecraftClient.getInstance();
+                if (client.currentScreen == null) {
+                    var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
+                    for (var card : manager.getPinnedCards()) {
+                        if (card.isShowInHud()) {
+                            var pinnedScreen = card.getScreenInstance();
+                            if (pinnedScreen == null) {
+                                var target = card.getTargetStack();
+                                if (target != null && !target.isEmpty()) {
+                                    pinnedScreen = new com.ceketrum.cei.gui.screen.CeiItemInfoScreen(null, target, false);
+                                    card.setScreenInstance(pinnedScreen);
+                                }
+                            }
+                            if (pinnedScreen != null) {
+                                var window = client.getWindow();
+                                if (pinnedScreen.width != window.getScaledWidth() || pinnedScreen.height != window.getScaledHeight()) {
+                                    pinnedScreen.init(client, window.getScaledWidth(), window.getScaledHeight());
+                                }
+                                pinnedScreen.render(drawContext, -999, -999, 1.0f);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    public static class GameplayEvents {
+        @SubscribeEvent
+        public static void onPlayerLoggedIn(ClientPlayerNetworkEvent.LoggingIn event) {
+            BrewingRecipeManager.getInstance().clearCache();
+            LootTableSourceManager.getInstance().clearCache();
+        }
+        
+        @SubscribeEvent
+        public static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
+            BrewingRecipeManager.getInstance().clearCache();
+            LootTableSourceManager.getInstance().clearCache();
+        }
+    }
+}

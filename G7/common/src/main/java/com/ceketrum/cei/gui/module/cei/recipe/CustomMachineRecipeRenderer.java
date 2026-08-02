@@ -1,5 +1,6 @@
 package com.ceketrum.cei.gui.module.cei.recipe;
 
+import com.ceketrum.cei.i18n.CeiText;
 import com.ceketrum.cei.gui.constants.GuiConstants;
 import java.util.ArrayList;
 import java.util.List;
@@ -134,40 +135,17 @@ public class CustomMachineRecipeRenderer implements IRecipeRenderer {
     public static String getMachineName(Recipe<?> recipe, String lang) {
         Identifier typeId = BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType());
         if (typeId == null) {
-            return lang.toLowerCase().startsWith("fr") ? "Machine Inconnue" : "Unknown Machine";
+            return CeiText.t("cei.machine.unknown");
         }
         
         String namespace = typeId.getNamespace();
         String path = typeId.getPath();
         
         String machineAction = path.toLowerCase().replace("_", " ");
-        boolean isFrench = lang.toLowerCase().startsWith("fr");
-        
-        if (isFrench) {
-            machineAction = switch (machineAction) {
-                case "crushing" -> "Broyage";
-                case "milling" -> "Mouture";
-                case "sawing" -> "Sciage";
-                case "alloying" -> "Alliage";
-                case "compressing" -> "Compression";
-                case "infusing" -> "Infusion";
-                case "mixing" -> "Mélange";
-                case "crystallizing" -> "Cristallisation";
-                case "enriching" -> "Enrichissement";
-                case "smelting" -> "Cuisson";
-                case "blasting" -> "Haut Fourneau";
-                case "smoking" -> "Fumoir";
-                case "campfire cooking" -> "Feu de Camp";
-                case "stonecutting" -> "Taille de pierre";
-                case "smithing" -> "Forge";
-                case "condensing" -> "Condensation";
-                case "extracting" -> "Extraction";
-                case "press" -> "Presse";
-                default -> capitalizeString(machineAction);
-            };
-        } else {
-            machineAction = capitalizeString(machineAction);
-        }
+        // Une cle par action, avec repli sur le chemin embelli. Le switch
+        // francais qui etait ici ne laissait aux autres langues que le
+        // chemin brut, et il fallait le rouvrir pour chaque nouveau mod.
+        machineAction = CeiText.or("cei.action." + path, capitalizeString(machineAction));
         
         String modName = capitalizeString(namespace);
         

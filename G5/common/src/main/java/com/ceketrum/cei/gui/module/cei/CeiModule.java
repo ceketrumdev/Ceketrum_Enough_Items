@@ -43,6 +43,7 @@ public class CeiModule {
      */
     private static volatile List<ItemStack> sharedItemsCache = null;
     private List<ItemStack> filteredItemsCache = null;
+    private String lastFilterState = "";
     private String lastSearchText = "";
     private boolean hasCheckedHelpPopup = false;
 
@@ -106,10 +107,20 @@ public class CeiModule {
         int ceiY = panelRenderer.getCeiY();
         float animationSlideOffset = panelRenderer.getAnimationSlideOffset();
         float animationAlpha = panelRenderer.getAnimationAlpha();
+        // Le deroulant des filtres recouvre le haut de la liste : on
+        // empeche les items d'y etre dessines plutot que d'esperer que
+        // l'ordre de dessin suffise.
+        itemListRenderer.setClipTop(panelRenderer.getFilterPanel().dropdownBottom());
         ItemStack hovered = itemListRenderer.render(context, mouseX, mouseY, itemsToDisplay,
                                                     ceiHeight, itemsListStartY, ceiWidth, ceiX, ceiY, textRenderer,
                                                     animationSlideOffset, animationAlpha);
 
+        // Un item cache sous le deroulant ne doit ni s'allumer ni montrer
+        // son infobulle : le clic, lui, ira au panneau.
+        if (panelRenderer.getFilterPanel().covers(mouseX, mouseY)) {
+            hovered = null;
+            hoveredStack = null;
+        }
         if (hovered != null) {
             hoveredStack = hovered;
             isRecipePopupVisible = true;
@@ -154,6 +165,10 @@ public class CeiModule {
                 hoveredStack = null;
             }
         }
+        // Tout a la fin : le deroulant des filtres doit recouvrir la
+        // liste d'items, donc il se dessine apres elle.
+        panelRenderer.getFilterPanel().renderDropdown(context, textRenderer,
+                (double) mouseX, (double) mouseY);
     }
 
     /**
@@ -170,6 +185,9 @@ public class CeiModule {
         int itemsListStartY = panelRenderer.getItemsListStartY(textRenderer);
         List<ItemStack> itemsToDisplay = getFilteredItems();
 
+        if (panelRenderer.getFilterPanel().scroll(mouseX, mouseY, verticalAmount)) {
+            return true;
+        }
         return itemListRenderer.handleScroll(mouseX, mouseY, verticalAmount, itemsToDisplay,
                                             ceiHeight, itemsListStartY, ceiWidth, ceiX, ceiY, animationSlideOffset);
     }
@@ -194,6 +212,18 @@ public class CeiModule {
             return true;
         }
 
+        // L'ascenseur passe avant les items : il les recouvre a
+        // l'ecran, il doit aussi les preceder au clic.
+        if (button == 0 && itemListRenderer.handleBarClick(mouseX, mouseY)) {
+            return true;
+        }
+
+        if (panelRenderer.getFilterPanel().click(mouseX, mouseY)) {
+            filteredItemsCache = null;
+            itemListRenderer.resetScroll();
+            return true;
+        }
+
         // PRIORITÉ 2: Vérifier Shift + Click sur un item pour ajouter/retirer des favoris
         // PRIORITÉ 3: Vérifier le clic sur un item pour placement automatique dans la table de craft
         // Chercher quel item est cliqué
@@ -203,14 +233,15 @@ public class CeiModule {
         int availableHeight = ceiBottom - itemsListStartY;
         if (availableHeight < 0) availableHeight = 0;
         int maxVisibleRows = availableHeight / GuiConstants.SLOT_SIZE;
-        int maxVisibleItems = columns * maxVisibleRows;
-        int startIndex = itemListRenderer.getScrollOffset() * columns;
+        int maxVisibleItems = columns * (maxVisibleRows + 2);
+        int shift = itemListRenderer.getScrollShift();
+        int startIndex = itemListRenderer.getScrollRow() * columns;
 
         for (int i = startIndex; i < Math.min(itemsToDisplay.size(), startIndex + maxVisibleItems); i++) {
             ItemStack stack = itemsToDisplay.get(i);
             int relativeIndex = i - startIndex;
             int x = ceiX + GuiConstants.PADDING + (relativeIndex % columns) * GuiConstants.SLOT_SIZE;
-            int y = itemsListStartY + (relativeIndex / columns) * GuiConstants.SLOT_SIZE;
+            int y = itemsListStartY - shift + (relativeIndex / columns) * GuiConstants.SLOT_SIZE;
             if (GuiRenderHelper.isMouseOver((int) mouseX, (int) mouseY, x, y, GuiConstants.SLOT_SIZE, GuiConstants.SLOT_SIZE)) {
                 clickedItem = stack;
                 break;
@@ -315,6 +346,18 @@ public class CeiModule {
     }
 
     /**
+     * Fin d'un glisser d'ascenseur.
+     *
+     * Sans argument, volontairement : en 26.x les evenements de souris
+     * ne portent plus (x, y, bouton) mais un MouseButtonEvent, et on
+     * n'a besoin d'aucun de leurs champs. La signature de l'appelant
+     * n'a donc aucune importance.
+     */
+    public void handleMouseRelease() {
+        itemListRenderer.endBarDrag();
+    }
+
+    /**
      * Gère la saisie de caractères.
      *
      * @return true si le caractère a été géré, false sinon
@@ -401,9 +444,28 @@ public class CeiModule {
         String currentSearchText = panelRenderer.getSearchBar().getSearchText();
         boolean showFavoritesOnly = panelRenderer.isShowFavoritesOnly();
 
+        // Le cache depend aussi de l'etat des filtres : sans ce temoin, cocher
+        // un mod ne changerait rien tant que la recherche ne bouge pas.
+        String filterState = panelRenderer.getFilterPanel().activeCount()
+                + "/" + panelRenderer.getFilterPanel().isActive();
+        if (!filterState.equals(lastFilterState)) {
+            filteredItemsCache = null;
+            lastFilterState = filterState;
+        }
+
         if (filteredItemsCache == null || !currentSearchText.equals(lastSearchText)) {
             List<ItemStack> allItems = getAllItems();
             filteredItemsCache = ItemFilter.filterItems(allItems, currentSearchText);
+
+            // Les filtres s'appliquent APRES la recherche : ils reduisent
+            // un resultat, ils ne le remplacent pas.
+            var filters = panelRenderer.getFilterPanel();
+            filters.build(allItems);
+            if (filters.isActive()) {
+                filteredItemsCache = filteredItemsCache.stream()
+                        .filter(filters::accepts)
+                        .collect(java.util.stream.Collectors.toList());
+            }
 
             // Filtrer par favoris si nécessaire
             if (showFavoritesOnly) {
