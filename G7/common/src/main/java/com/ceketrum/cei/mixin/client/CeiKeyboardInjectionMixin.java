@@ -69,6 +69,35 @@ public abstract class CeiKeyboardInjectionMixin {
                     }
                 }
                 
+                // Mode developpeur : C copie l'item survole, Maj+C change
+                // de format puis copie. Teste APRES R et U pour ne rien leur
+                // prendre, et seulement si l'option est cochee -- sinon la
+                // touche reste disponible pour le reste du jeu.
+                //
+                // "mods" est ici le masque GLFW reel, dans les sept lignees :
+                // le test de Maj y est donc le meme partout.
+                if (key == com.ceketrum.cei.gui.util.CeiKeys.C && com.ceketrum.cei.gui.module.cei.util.CeiDevTools.enabled()) {
+                    ItemStack devStack = null;
+
+                    net.minecraft.world.inventory.Slot devSlot =
+                            ((com.ceketrum.cei.mixin.client.HandledScreenAccessor) screen).getFocusedSlot();
+                    if (devSlot != null && devSlot.hasItem()) {
+                        devStack = devSlot.getItem();
+                    }
+                    if (devStack == null && !(screen instanceof CreativeModeInventoryScreen)) {
+                        devStack = CeiScreenHelper.getOrCreateModule(screen).getHoveredStack();
+                    }
+
+                    if (devStack != null && !devStack.isEmpty()) {
+                        var fmt = (mods & 1) != 0   // GLFW_MOD_SHIFT
+                                ? com.ceketrum.cei.gui.module.cei.util.CeiDevTools.nextFormat()
+                                : com.ceketrum.cei.gui.module.cei.util.CeiDevTools.currentFormat();
+                        com.ceketrum.cei.gui.module.cei.util.CeiDevTools.copy(devStack, fmt);
+                        ci.cancel();
+                        return;
+                    }
+                }
+
                 if (!(screen instanceof CreativeModeInventoryScreen)) {
                     CeiModule module = CeiScreenHelper.getOrCreateModule(screen);
                     if (module.handleKeyPress(key, scancode, mods)) {

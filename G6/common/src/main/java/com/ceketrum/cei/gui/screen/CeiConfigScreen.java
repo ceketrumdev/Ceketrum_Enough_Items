@@ -17,6 +17,7 @@ public class CeiConfigScreen extends Screen {
     private Button enableAnimationsButton;
     private Button showFavoritesButton;
     private Button showHelpPopupButton;
+    private Button devModeButton;
     private Button applyButton;
     private Button cancelButton;
     private Button resetButton;
@@ -74,6 +75,20 @@ public class CeiConfigScreen extends Screen {
             }
         ).bounds(centerX - 100, startY + spacing * 3, 200, 20).build();
         addRenderableWidget(showHelpPopupButton);
+
+        // Mode developpeur.
+        //
+        // Libelle en clair et non par cle de traduction : ajouter une cle
+        // obligerait a toucher tous les fichiers de langue pour une option
+        // que seuls les developpeurs de packs verront.
+        devModeButton = Button.builder(
+            Component.literal(config.isDevMode() ? "Dev mode : ON" : "Dev mode : OFF"),
+            button -> {
+                config.setDevMode(!config.isDevMode());
+                button.setMessage(Component.literal(config.isDevMode() ? "Dev mode : ON" : "Dev mode : OFF"));
+            }
+        ).bounds(centerX - 100, startY + spacing * 4, 200, 20).build();
+        addRenderableWidget(devModeButton);
 
         // Boutons d'action
         int buttonY = height - 40;

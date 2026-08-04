@@ -18,6 +18,7 @@ public class CeiConfigScreen extends Screen {
     private ButtonWidget enableAnimationsButton;
     private ButtonWidget showFavoritesButton;
     private ButtonWidget showHelpPopupButton;
+    private ButtonWidget devModeButton;
     private ButtonWidget applyButton;
     private ButtonWidget cancelButton;
     private ButtonWidget resetButton;
@@ -75,6 +76,20 @@ public class CeiConfigScreen extends Screen {
             }
         ).dimensions(centerX - 100, startY + spacing * 3, 200, 20).build();
         addDrawableChild(showHelpPopupButton);
+
+        // Mode developpeur.
+        //
+        // Libelle en clair et non par cle de traduction : ajouter une cle
+        // obligerait a toucher tous les fichiers de langue pour une option
+        // que seuls les developpeurs de packs verront.
+        devModeButton = ButtonWidget.builder(
+            Text.literal(config.isDevMode() ? "Dev mode : ON" : "Dev mode : OFF"),
+            button -> {
+                config.setDevMode(!config.isDevMode());
+                button.setMessage(Text.literal(config.isDevMode() ? "Dev mode : ON" : "Dev mode : OFF"));
+            }
+        ).dimensions(centerX - 100, startY + spacing * 4, 200, 20).build();
+        addDrawableChild(devModeButton);
 
         // Boutons d'action
         int buttonY = height - 40;

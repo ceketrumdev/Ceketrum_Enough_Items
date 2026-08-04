@@ -1720,6 +1720,15 @@ public class CeiItemInfoScreen extends Screen {
      * son niveau d'acces dans la lignee visee.
      */
     public static String itemTooltipText(ItemStack stack, int maxLines) {
+        return itemTooltipText(stack, maxLines, true);
+    }
+
+    /**
+     * @param withInspector ajoute les lignes du mode developpeur en fin de
+     *                      texte. Elles ne sont produites que si l'option est
+     *                      cochee, l'appelant n'a donc rien a tester.
+     */
+    public static String itemTooltipText(ItemStack stack, int maxLines, boolean withInspector) {
         if (stack == null || stack.isEmpty()) return "";
         StringBuilder out = new StringBuilder();
         int kept = 0;
@@ -1754,6 +1763,13 @@ public class CeiItemInfoScreen extends Screen {
             // Une infobulle moddee qui leve ne doit pas emporter le rendu de
             // toute la fiche.
             return "";
+        }
+        String inspector = withInspector
+                ? com.ceketrum.cei.gui.module.cei.util.CeiDevTools.inspect(stack)
+                : "";
+        if (!inspector.isEmpty()) {
+            if (out.length() > 0) out.append('\n');
+            out.append(inspector);
         }
         return out.toString();
     }
@@ -2123,6 +2139,15 @@ public class CeiItemInfoScreen extends Screen {
         }
 
         if (hoverStack != null && !hoverStack.isEmpty()) {
+            // Mode developpeur : meme touche que dans l'inventaire, pour que
+            // le geste soit le meme partout.
+            if (keyCode == 67 && com.ceketrum.cei.gui.module.cei.util.CeiDevTools.enabled()) {
+                var fmt = (modifiers & 1) != 0   // GLFW_MOD_SHIFT
+                        ? com.ceketrum.cei.gui.module.cei.util.CeiDevTools.nextFormat()
+                        : com.ceketrum.cei.gui.module.cei.util.CeiDevTools.currentFormat();
+                com.ceketrum.cei.gui.module.cei.util.CeiDevTools.copy(hoverStack, fmt);
+                return true;
+            }
             if (keyCode == 82) { // 'R'
                 Minecraft.getInstance().setScreen(new CeiItemInfoScreen(this.parentScreen, hoverStack, false));
                 return true;

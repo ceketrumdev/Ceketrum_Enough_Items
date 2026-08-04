@@ -1,6 +1,5 @@
 package com.ceketrum.cei.gui.module.cei.util;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -9,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.stream.Stream;
 
 import net.minecraft.world.item.ItemStack;
 
@@ -32,17 +30,6 @@ import net.minecraft.world.item.ItemStack;
 public final class CeiTagIndex {
 
     private CeiTagIndex() {}
-
-    /** Comment obtenir le porteur de registre d'une pile. */
-    private static final String[] HOLDER_OF_STACK = {
-            "getItemHolder", "typeHolder", "getRegistryEntry"
-    };
-    /** Comment obtenir le flux de tags d'un porteur. */
-    private static final String[] TAGS_OF_HOLDER = { "tags", "streamTags" };
-    /** Certaines lignees exposent les tags directement sur la pile. */
-    private static final String[] TAGS_OF_STACK = { "getTags", "streamTags" };
-    /** Comment lire l'identifiant d'une cle de tag. */
-    private static final String[] ID_OF_KEY = { "location", "id" };
 
     private static Map<Object, Set<String>> byItem = null;
     private static List<String> names = Collections.emptyList();
@@ -112,41 +99,50 @@ public final class CeiTagIndex {
         return false;
     }
 
-    // ------------------------------------------------------------ reflexion
-
-    private static Iterable<Object> tagKeys(ItemStack stack) {
-        Stream<?> stream = call(stack, TAGS_OF_STACK);
-        if (stream == null) {
-            Object holder = callObject(stack, HOLDER_OF_STACK);
-            if (holder != null) stream = call(holder, TAGS_OF_HOLDER);
+    /**
+     * Les tags d'une pile, resolus a la demande.
+     *
+     * Ne passe PAS par l'index : celui-ci n'est construit qu'au premier # tape,
+     * et le mode developpeur doit pouvoir repondre sans qu'on ait cherche quoi
+     * que ce soit. Le cout est celui d'un appel reflexif, sur une frappe.
+     */
+    public static List<String> tagsOf(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return Collections.emptyList();
+        List<String> out = new ArrayList<>();
+        for (Object key : tagKeys(stack)) {
+            String id = idOf(key);
+            if (id != null && !out.contains(id)) out.add(id);
         }
-        if (stream == null) return Collections.emptyList();
-        List<Object> out = new ArrayList<>();
-        stream.forEach(out::add);
         return out;
     }
 
-    private static Stream<?> call(Object target, String[] candidates) {
-        Object r = callObject(target, candidates);
-        return (r instanceof Stream<?>) ? (Stream<?>) r : null;
-    }
+    // --------------------------------------------------------- acces direct
+    //
+    // L'ancienne version resolvait ces deux operations par reflexion sur des
+    // noms candidats. Cela ne pouvait pas fonctionner en production : Fabric
+    // remappe le jar du mod vers l'intermediaire, NeoForge 1.20.1 vers le SRG.
+    // Un nom Yarn ou Mojang ecrit dans une chaine n'existe plus a l'execution,
+    // et l'index restait vide sans le moindre message.
+    //
+    // La divergence entre lignees est reelle, mais elle se traite au patch,
+    // par jetons -- pas au vol. L'appel ci-dessous est compile, donc remappe
+    // comme le reste du mod.
 
-    private static Object callObject(Object target, String[] candidates) {
-        if (target == null) return null;
-        for (String name : candidates) {
-            try {
-                Method m = target.getClass().getMethod(name);
-                m.setAccessible(true);
-                return m.invoke(target);
-            } catch (Exception | LinkageError e) {
-                // nom absent sur cette lignee : on essaie le suivant
-            }
+    private static Iterable<Object> tagKeys(ItemStack stack) {
+        List<Object> out = new ArrayList<>();
+        try {
+            stack.typeHolder().tags().forEach(out::add);
+        } catch (Exception | LinkageError e) {
+            // Une pile sans porteur de registre (cas limite d'un mod) ne doit
+            // pas interrompre la construction de l'index.
+            return Collections.emptyList();
         }
-        return null;
+        return out;
     }
 
     private static String idOf(Object tagKey) {
-        Object id = callObject(tagKey, ID_OF_KEY);
-        return id == null ? null : String.valueOf(id).toLowerCase();
+        if (!(tagKey instanceof net.minecraft.tags.TagKey<?> key)) return null;
+        var id = key.location();
+        return id == null ? null : id.toString().toLowerCase();
     }
 }

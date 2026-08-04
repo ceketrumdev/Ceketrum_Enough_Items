@@ -60,6 +60,12 @@ public class CeiConfig {
      * pendant le calibrage des optimisations de la 0.1.5.
      */
     private boolean diagnostics = false;
+
+    /**
+     * Mode developpeur : export presse-papier a la touche C et inspecteur
+     * d'item. Decoche, rien de tout cela ne s'execute.
+     */
+    private boolean devMode = false;
     
     private CeiConfig() {
         Path configDir = PlatformHelper.getConfigDirectory().resolve("cei");
@@ -121,6 +127,7 @@ public class CeiConfig {
             // Nouveau pipeline de recettes (chemin parallele, cf. CeiRecipeAdapter)
             if (json.has("useNewRecipeRenderer")) useNewRecipeRenderer = json.get("useNewRecipeRenderer").getAsBoolean();
             if (json.has("diagnostics")) diagnostics = json.get("diagnostics").getAsBoolean();
+            if (json.has("devMode")) devMode = json.get("devMode").getAsBoolean();
             com.ceketrum.cei.diag.CeiDiagnostics.ENABLED = diagnostics;
             
             LOGGER.info("Configuration chargée depuis {}", configFile);
@@ -162,6 +169,7 @@ public class CeiConfig {
             json.addProperty("showHelpPopup", showHelpPopup);
             json.addProperty("useNewRecipeRenderer", useNewRecipeRenderer);
             json.addProperty("diagnostics", diagnostics);
+            json.addProperty("devMode", devMode);
             
             Files.writeString(configFile, json.toString());
             LOGGER.debug("Configuration sauvegardée dans {}", configFile);
@@ -224,6 +232,8 @@ public class CeiConfig {
     
     // Getters et setters pour les animations
     public boolean isDiagnostics() { return diagnostics; }
+    public boolean isDevMode() { return devMode; }
+    public void setDevMode(boolean v) { this.devMode = v; }
     public void setDiagnostics(boolean v) { this.diagnostics = v; com.ceketrum.cei.diag.CeiDiagnostics.ENABLED = v; }
 
     public boolean isUseNewRecipeRenderer() { return useNewRecipeRenderer; }

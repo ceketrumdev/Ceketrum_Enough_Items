@@ -55,6 +55,12 @@ public class CeiConfig {
      * drapeau, le temps de comparer les deux rendus.
      */
     private boolean useNewRecipeRenderer = true;
+
+    /**
+     * Mode developpeur : export presse-papier a la touche C et inspecteur
+     * d'item. Decoche, rien de tout cela ne s'execute.
+     */
+    private boolean devMode = false;
     
     private CeiConfig() {
         Path configDir = PlatformHelper.getConfigDirectory().resolve("cei");
@@ -115,6 +121,7 @@ public class CeiConfig {
 
             // Nouveau pipeline de recettes (cf. CeiRecipeAdapter)
             if (json.has("useNewRecipeRenderer")) useNewRecipeRenderer = json.get("useNewRecipeRenderer").getAsBoolean();
+            if (json.has("devMode")) devMode = json.get("devMode").getAsBoolean();
             
             LOGGER.info("Configuration chargée depuis {}", configFile);
         } catch (Exception e) {
@@ -154,6 +161,7 @@ public class CeiConfig {
             // Popup d'aide
             json.addProperty("showHelpPopup", showHelpPopup);
             json.addProperty("useNewRecipeRenderer", useNewRecipeRenderer);
+            json.addProperty("devMode", devMode);
             
             Files.writeString(configFile, json.toString());
             LOGGER.debug("Configuration sauvegardée dans {}", configFile);
@@ -226,6 +234,8 @@ public class CeiConfig {
     
     // Getters et setters pour la popup d'aide
     public boolean isUseNewRecipeRenderer() { return useNewRecipeRenderer; }
+    public boolean isDevMode() { return devMode; }
+    public void setDevMode(boolean v) { this.devMode = v; }
     public void setUseNewRecipeRenderer(boolean v) { this.useNewRecipeRenderer = v; }
 
     public boolean isShowHelpPopup() { return showHelpPopup; }

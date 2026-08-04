@@ -28,6 +28,8 @@ public final class CeiKeys {
     // Lettres : ASCII minuscule en SDL, ASCII majuscule en GLFW
     public static final int R = SDL ? 114 : 82;
     public static final int U = SDL ? 117 : 85;
+    /** Mode developpeur. Meme regle que R et U : minuscule en SDL. */
+    public static final int C = SDL ? 99 : 67;
 
     public static final int ESCAPE    = SDL ? 27  : 256;
     public static final int BACKSPACE = SDL ? 8   : 259;
