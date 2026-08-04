@@ -1,5 +1,6 @@
 package com.ceketrum.cei.gui.module.cei;
 
+import com.ceketrum.cei.gui.module.cei.components.CeiSearchHelp;
 import com.ceketrum.cei.data.FavoriteItemsManager;
 import com.ceketrum.cei.data.ItemDescriptionManager;
 import com.ceketrum.cei.gui.module.cei.components.CeiItemListRenderer;
@@ -92,8 +93,10 @@ public class CeiModule {
                       net.minecraft.world.item.crafting.RecipeManager recipeManager,
                       net.minecraft.core.RegistryAccess registryManager) {
         long cei$frame = com.ceketrum.cei.diag.CeiDiagnostics.begin();
+        long cei$chrome = com.ceketrum.cei.diag.CeiDiagnostics.begin();
         // Rendre le panneau CEI (inclut la barre de recherche)
         panelRenderer.render(context, screenHeight, screenWidth, textRenderer, (double) mouseX, (double) mouseY);
+        com.ceketrum.cei.diag.CeiDiagnostics.frame("Panneau : cadre", cei$chrome);
 
         // Obtenir la position Y où commence la liste d'items
         int itemsListStartY = panelRenderer.getItemsListStartY(textRenderer);
@@ -117,10 +120,16 @@ public class CeiModule {
         // Le deroulant des filtres recouvre le haut de la liste : on
         // empeche les items d'y etre dessines plutot que d'esperer que
         // l'ordre de dessin suffise.
-        itemListRenderer.setClipTop(panelRenderer.getFilterPanel().dropdownBottom());
+        // Deux fenetres peuvent recouvrir le haut de la liste : le deroulant
+        // des filtres et la completion. On prend la plus basse des deux.
+        itemListRenderer.setClipTop(Math.max(
+                panelRenderer.getFilterPanel().dropdownBottom(),
+                panelRenderer.getSearchHelp().overlayBottom()));
+        long cei$list = com.ceketrum.cei.diag.CeiDiagnostics.begin();
         ItemStack hovered = itemListRenderer.render(context, mouseX, mouseY, itemsToDisplay,
                                                     ceiHeight, itemsListStartY, ceiWidth, ceiX, ceiY, textRenderer,
                                                     animationSlideOffset, animationAlpha);
+        com.ceketrum.cei.diag.CeiDiagnostics.frame("Panneau : liste (total)", cei$list);
 
         // Un item cache sous le deroulant ne doit ni s'allumer ni montrer
         // son infobulle : le clic, lui, ira au panneau.
@@ -144,6 +153,7 @@ public class CeiModule {
             context.pose().pushPose();
             context.pose().translate(0, 0, 1000); // Z-index élevé pour être au-dessus
 
+            long cei$popup = com.ceketrum.cei.diag.CeiDiagnostics.begin();
             recipePopupRenderer.render(context, mouseX, mouseY, hoveredStack,
                                      screenWidth, screenHeight,
                                      recipeManager,
@@ -152,6 +162,7 @@ public class CeiModule {
                                      ceiX, ceiWidth);
 
             context.pose().popPose();
+            com.ceketrum.cei.diag.CeiDiagnostics.frame("Panneau : fenetre de survol", cei$popup);
         }
 
         // Rendre la popup d'aide (z-index très élevé)
@@ -163,7 +174,14 @@ public class CeiModule {
         }
 
         // Réinitialisation de l'état si aucun item n'est survolé
-        if (!itemListRenderer.isAnyItemHovered(mouseX, mouseY, itemsToDisplay, ceiHeight, itemsListStartY, ceiWidth, ceiX, ceiY, animationSlideOffset)) {
+        // Ce que render() a renvoye fait foi : il a teste chaque case visible
+        // avec exactement la meme geometrie. Reparcourir la liste entiere pour
+        // reposer la meme question doublait le parcours a chaque image.
+        //
+        // Au passage, la reponse devient juste dans un cas ou elle ne l'etait
+        // pas : une case cachee sous le deroulant des filtres compte desormais
+        // comme non survolee, ce que l'ancien second parcours ignorait.
+        if (hovered == null) {
             isRecipePopupVisible = false;
             // Ne pas mettre hoveredStack à null immédiatement pour éviter que l'animation redémarre
             // Le hoveredStack sera mis à null au prochain render si toujours pas survolé
@@ -176,6 +194,9 @@ public class CeiModule {
         // Tout a la fin : le deroulant des filtres doit recouvrir la
         // liste d'items, donc il se dessine apres elle.
         panelRenderer.getFilterPanel().renderDropdown(context, textRenderer,
+                (double) mouseX, (double) mouseY);
+        // Apres tout le reste : l'aide et la completion recouvrent.
+        panelRenderer.getSearchHelp().renderOverlay(context, textRenderer,
                 (double) mouseX, (double) mouseY);
     }
 
@@ -339,6 +360,15 @@ public class CeiModule {
         int searchBarX = ceiX + 5;
         int searchBarY = ceiY + 5 + textRenderer.lineHeight + 3;
         int searchBarWidth = ceiWidth - 10;
+
+        // La completion passe avant la barre : elle la recouvre.
+        String completed = panelRenderer.getSearchHelp().click(mouseX, mouseY);
+        if (completed != null) {
+            panelRenderer.getSearchBar().setSearchText(completed);
+            filteredItemsCache = null;
+            itemListRenderer.resetScroll();
+            return true;
+        }
 
         boolean clickedOnSearchBar = panelRenderer.getSearchBar().mouseClicked(mouseX, mouseY, button, searchBarX, searchBarY, searchBarWidth);
 

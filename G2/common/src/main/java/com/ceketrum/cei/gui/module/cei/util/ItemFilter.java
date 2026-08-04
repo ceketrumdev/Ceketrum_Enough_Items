@@ -4,6 +4,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,27 +35,37 @@ public class ItemFilter {
         // "create" ramene aussi bien le mod Create que tout ce qui contient
         // "creative" -- le namespace etait deja consulte, mais melange aux
         // trois autres criteres, donc impossible a viser seul.
-        String namespaceQuery = null;
-        if (query.startsWith("@")) {
-            int space = query.indexOf(' ');
-            namespaceQuery = squash(space < 0 ? query.substring(1) : query.substring(1, space));
-            query = (space < 0) ? "" : query.substring(space + 1).trim();
+        Query q = parse(searchText);
+        // L'index des tags est bati au premier # tape, pas au demarrage :
+        // c'est un passage complet sur la liste d'items, et la plupart des
+        // joueurs ne s'en serviront jamais.
+        if (!q.tag.isEmpty()) CeiTagIndex.build(items);
+
+        // Les prefixes se composent : "@create ^cog" est un mod ET une
+        // expression. Chacun retire des candidats, aucun ne remplace
+        // les autres.
+        if (q.hasPrefix()) {
+            List<ItemStack> narrowed = new ArrayList<>();
+            for (ItemStack stack : items) {
+                var id = Registries.ITEM.getId(stack.getItem());
+                if (id == null) continue;
+                if (!q.namespace.isEmpty()
+                        && !squash(id.getNamespace()).contains(q.namespace)) continue;
+                String full = id.toString().toLowerCase();
+                String nm;
+                try { nm = stack.getName().getString().toLowerCase(); }
+                catch (Exception e) { nm = full; }
+                if (!matchesExtras(stack, q, full, nm)) continue;
+                narrowed.add(stack);
+            }
+            items = narrowed;
         }
 
-        if (namespaceQuery != null && !namespaceQuery.isEmpty()) {
-            final String wanted = namespaceQuery;
-            items = items.stream()
-                    .filter(stack -> squash(Registries.ITEM.getId(stack.getItem()).getNamespace()).contains(wanted))
-                    .collect(Collectors.toList());
-        }
-
-        // "@create" seul : le mod entier. "@create shaft" : le mod, puis la
-        // recherche habituelle par-dessus. Les deux se composent.
-        if (query.isEmpty()) {
+        if (q.text.isEmpty()) {
             return items;
         }
 
-        String lowerSearch = query.toLowerCase();
+        String lowerSearch = q.text;
 
         return items.stream()
                 .filter(stack -> {
@@ -103,6 +114,91 @@ public class ItemFilter {
             if (c != '_' && c != '-' && c != ' ' && c != '.') out.append(c);
         }
         return out.toString();
+    }
+
+    /**
+     * Ce qu'une ligne de recherche demande vraiment.
+     *
+     * Un seul endroit lit les prefixes, pour que les deux chemins de filtrage
+     * -- l'indexe et le lent -- ne puissent pas les interpreter differemment.
+     */
+    public static final class Query {
+        public String namespace = "";   // @mod
+        public String regex = "";       // ^expr
+        public String description = ""; // $texte
+        public String tag = "";         // #tag
+        public String text = "";        // le reste
+
+        public boolean hasPrefix() {
+            return !namespace.isEmpty() || !regex.isEmpty()
+                    || !description.isEmpty() || !tag.isEmpty();
+        }
+    }
+
+    public static Query parse(String searchText) {
+        Query q = new Query();
+        if (searchText == null) return q;
+        String s = searchText.trim();
+        if (s.isEmpty()) return q;
+
+        char c = s.charAt(0);
+        if (c == '@' || c == '$' || c == '^' || c == '#') {
+            int space = s.indexOf(' ');
+            String head = (space < 0) ? s.substring(1) : s.substring(1, space);
+            String rest = (space < 0) ? "" : s.substring(space + 1).trim();
+            if (c == '@') q.namespace = squash(head);
+            else if (c == '$') q.description = head.toLowerCase();
+            else if (c == '#') q.tag = head.toLowerCase();
+            else q.regex = head;
+            q.text = rest.toLowerCase();
+            return q;
+        }
+        q.text = s.toLowerCase();
+        return q;
+    }
+
+    /**
+     * La regex compilee, ou null si elle ne tient pas debout.
+     *
+     * Une expression est incomplete a peu pres a chaque touche pendant qu'on
+     * la tape. La refuser en vidant la liste rendrait la frappe illisible :
+     * on retombe sur "commence par", qui est ce que l'utilisateur voulait
+     * neuf fois sur dix de toute facon.
+     */
+    private static java.util.regex.Pattern compile(String expr) {
+        try {
+            return java.util.regex.Pattern.compile(expr, java.util.regex.Pattern.CASE_INSENSITIVE);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean matchesExtras(ItemStack stack, Query q, String id, String name) {
+        if (!q.regex.isEmpty()) {
+            java.util.regex.Pattern p = compile(q.regex);
+            if (p == null) {
+                String low = q.regex.toLowerCase();
+                if (!name.startsWith(low) && !id.startsWith(low)
+                        && !shortId(id).startsWith(low)) return false;
+            } else if (!p.matcher(name).find() && !p.matcher(id).find()) {
+                return false;
+            }
+        }
+        if (!q.tag.isEmpty() && !CeiTagIndex.matches(stack, q.tag)) return false;
+        if (!q.description.isEmpty()) {
+            // La description vient du mod lui-meme : pas d'infobulle du jeu,
+            // dont la signature a change trois fois et dont le calcul peut
+            // declencher du rendu.
+            String d = com.ceketrum.cei.data.ItemDescriptionManager.getInstance()
+                    .getDescription(stack.getItem());
+            if (d == null || !d.toLowerCase().contains(q.description)) return false;
+        }
+        return true;
+    }
+
+    private static String shortId(String fullId) {
+        int i = fullId.indexOf(':');
+        return i < 0 ? fullId : fullId.substring(i + 1);
     }
 }
 

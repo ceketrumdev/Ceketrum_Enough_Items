@@ -13,6 +13,7 @@ import net.minecraft.util.Formatting;
  */
 public class CeiPanelRenderer {
     private final CeiFilterPanel filterPanel = new CeiFilterPanel();
+    private final CeiSearchHelp searchHelp = new CeiSearchHelp();
     private final SearchBar searchBar = new SearchBar();
     private boolean showFavoritesOnly = false;
     private long panelOpenTime = System.currentTimeMillis();
@@ -239,9 +240,20 @@ public class CeiPanelRenderer {
 
         // Barre de recherche
         int searchBarY = titleY + textRenderer.fontHeight + 3;
+        // Pleine largeur : le bouton "?" se pose DANS le bord droit, sur
+        // l'espace vide, au lieu d'amputer la barre. Lui retirer de la place
+        // rapprochait sa troncature interne du point ou elle vide le texte,
+        // et amputait aussi sa zone cliquable.
         int searchBarWidth = ceiWidth - 10;
         int searchBarX = ceiX + 5;
         searchBar.render(context, searchBarX, searchBarY, searchBarWidth, textRenderer);
+        searchHelp.renderButton(context, searchBarX + searchBarWidth - CeiSearchHelp.BUTTON_W - 1,
+                searchBarY, textRenderer, mouseX, mouseY,
+                searchBar.getSearchText(), filterPanel.modIds(),
+                com.ceketrum.cei.gui.module.cei.util.CeiTagIndex.tagNames(),
+                // Le haut de la liste est deja decide par getItemsListStartY :
+                // on le lui demande au lieu de le recalculer ici.
+                getItemsListStartY(textRenderer), ceiX, ceiWidth);
 
         // Séparateur sous la barre de recherche
         int separatorY = searchBarY + 14 + 3; // 14 = hauteur de la barre de recherche
@@ -283,6 +295,10 @@ public class CeiPanelRenderer {
         filterPanel.render(context, favoritesButtonX + favoritesButtonWidth + 4,
                 favoritesButtonY, favoritesButtonWidth, ceiX, ceiWidth,
                 textRenderer, mouseX, mouseY);
+    }
+
+    public CeiSearchHelp getSearchHelp() {
+        return searchHelp;
     }
 
     public CeiFilterPanel getFilterPanel() {

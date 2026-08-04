@@ -50,10 +50,33 @@ public class CeiItemInfoScreen extends Screen {
     private float currentOpacity = 1.0f;
 
     // Position and size
-    private int containerWidth = 240;
-    private int containerHeight = 180;
+    private int containerWidth = com.ceketrum.cei.data.PinnedRecipeManager.PinnedCard.DEFAULT_WIDTH;
+    private int containerHeight = com.ceketrum.cei.data.PinnedRecipeManager.PinnedCard.DEFAULT_HEIGHT;
     private int containerX;
     private int containerY;
+
+    /** Cote de la zone sensible de la poignee de redimensionnement, en pixels. */
+    private static final int RESIZE_GRIP = 12;
+
+    /**
+     * Hauteur minimale laissee a la recette. En dessous, le texte de l'item ne
+     * prend aucune place : c'est la recette qui prime.
+     */
+    private static final int RECIPE_MIN_H = 92;
+    /** Au-dela, une infobulle moddee volumineuse mangerait toute la fiche. */
+    private static final int DESC_MAX_LINES = 24;
+
+    /**
+     * Zone de texte sous la recette : defilement, et bornes memorisees au
+     * dessin. C'est ce qui a ete reellement dessine qui borne la molette,
+     * jamais un second calcul de mise en page.
+     */
+    private int descScroll = 0;
+    private int descBandX = 0;
+    private int descBandY = 0;
+    private int descBandW = 0;
+    private int descBandH = 0;
+    private int descTotalH = 0;
 
     // Tabs configuration
     public enum TabType {
@@ -109,7 +132,6 @@ public class CeiItemInfoScreen extends Screen {
     private RecipeCategory activeCategory;
 
     /** Onglets de categorie affiches simultanement dans la colonne de gauche. */
-    private static final int MAX_VISIBLE_CATEGORIES = 6;
     /** Hauteur des boutons de defilement. */
     private static final int SCROLL_BTN_H = 12;
     /** Index du premier onglet affiche. */
@@ -211,6 +233,24 @@ public class CeiItemInfoScreen extends Screen {
 
         // Update categories
         updateCategories();
+
+        // updateCategories() repart toujours de la premiere categorie et de la
+        // page zero -- c'est ce qu'il faut pour un ecran ouvert a la volee.
+        // Mais pour une fiche epinglee, ce qu'elle avait retenu vient d'etre
+        // efface. On le repose, apres coup et seulement s'il existe encore :
+        // une categorie disparue laisserait l'ecran sur du vide.
+        var pinnedCard = com.ceketrum.cei.data.PinnedRecipeManager.getInstance()
+                .getPinnedCard(this.targetStack);
+        if (pinnedCard != null) {
+            var savedCategory = pinnedCard.getActiveCategory();
+            if (savedCategory != null && categories.contains(savedCategory)) {
+                activeCategory = savedCategory;
+                int savedPage = pinnedCard.getCurrentPage();
+                if (savedPage >= 0 && savedPage < getMaxPages()) {
+                    currentPage = savedPage;
+                }
+            }
+        }
     }
 
     private void scanRecipes() {
@@ -392,11 +432,7 @@ public class CeiItemInfoScreen extends Screen {
     public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
         var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
         var card = manager.getPinnedCard(this.targetStack);
-        int currentXOffset = card != null ? (int) card.getxOffset() : 0;
-        int currentYOffset = card != null ? (int) card.getyOffset() : 0;
-
-        this.containerX = (this.width - this.containerWidth) / 2 + currentXOffset;
-        this.containerY = (this.height - this.containerHeight) / 2 + currentYOffset;
+        syncCardGeometry(card);
 
         // 1. Draw the native background blur shader and dimming first (flouts the world cleanly in the background)
         // ONLY if this is the active current screen (not rendered as an overlay on top of inventory!)
@@ -455,6 +491,23 @@ public class CeiItemInfoScreen extends Screen {
                 this.minecraft.getConnection().recipes(),
                 this.minecraft.level.registryAccess()
             );
+        }
+
+        // Poignee de redimensionnement : deux traits obliques dans le coin
+        // bas-droit. Dessinee apres le contenu, avant les infobulles. Les
+        // coordonnees viennent des memes resizeGripX/Y que le test de clic.
+        if (card != null) {
+            int gripX = resizeGripX();
+            int gripY = resizeGripY();
+            boolean gripHot = card.isResizing() || isOverResizeGrip(mouseX, mouseY);
+            int gripColor = applyOpacity(gripHot ? 0xFFFFFFFF : 0xAAFFFFFF, currentOpacity);
+            // Trait exterieur, puis trait interieur, du bas-gauche vers le haut-droit.
+            for (int i = 0; i < 9; i++) {
+                context.fill(gripX + 2 + i, gripY + 10 - i, gripX + 3 + i, gripY + 11 - i, gripColor);
+            }
+            for (int i = 0; i < 5; i++) {
+                context.fill(gripX + 6 + i, gripY + 10 - i, gripX + 7 + i, gripY + 11 - i, gripColor);
+            }
         }
 
         // Draw Tooltips (Hovered slot or Tab icons)
@@ -615,7 +668,7 @@ public class CeiItemInfoScreen extends Screen {
     /** Fin (exclue) de la fenetre dessinee, un cran apres le dernier visible. */
     private int categoryDrawTo() {
         return Math.min(categories.size(),
-                (int) Math.ceil(categoryScrollAnim) + MAX_VISIBLE_CATEGORIES + 1);
+                (int) Math.ceil(categoryScrollAnim) + maxVisibleCategories() + 1);
     }
 
     /** Haut de la bande visible. */
@@ -623,9 +676,21 @@ public class CeiItemInfoScreen extends Screen {
         return categoryTabsTop();
     }
 
-    /** Bas de la bande : exactement six onglets, le dernier compris. */
+    /**
+     * Bas de la bande visible.
+     *
+     * On descend jusqu'au bord utile de la colonne, et non jusqu'a la fin du
+     * dernier onglet entier : la hauteur d'une fiche tombe rarement sur un
+     * multiple de 26, et ce qui restait ne servait a rien. Le haut de l'onglet
+     * suivant y depasse desormais, ce qui montre qu'il y en a d'autres.
+     *
+     * Le Math.max garantit qu'on ne coupe jamais en deca des onglets entiers
+     * que maxVisibleCategories() a comptes.
+     */
     private int categoryBandBottom() {
-        return categoryTabsTop() + (MAX_VISIBLE_CATEGORIES - 1) * 26 + 22;
+        int usable = containerY + containerHeight
+                - (categoriesScrollable() ? SCROLL_BTN_H + 2 : 10);
+        return Math.max(categoryTabsTop() + (maxVisibleCategories() - 1) * 26 + 22, usable);
     }
 
     /**
@@ -658,14 +723,14 @@ public class CeiItemInfoScreen extends Screen {
         if (mouseY < categoryScrollUpY()
                 || mouseY >= categoryScrollDownY() + SCROLL_BTN_H) return false;
 
-        int max = Math.max(0, categories.size() - MAX_VISIBLE_CATEGORIES);
+        int max = Math.max(0, categories.size() - maxVisibleCategories());
         int step = (amount > 0) ? -1 : (amount < 0 ? 1 : 0);
         categoryScroll = Math.max(0, Math.min(max, categoryScroll + step));
         return true;
     }
 
     private int firstVisibleCategory() {
-        int max = Math.max(0, categories.size() - MAX_VISIBLE_CATEGORIES);
+        int max = Math.max(0, categories.size() - maxVisibleCategories());
         if (categoryScroll > max) categoryScroll = max;
         if (categoryScroll < 0) categoryScroll = 0;
         return categoryScroll;
@@ -673,12 +738,12 @@ public class CeiItemInfoScreen extends Screen {
 
     /** Index de fin (exclu) de la fenetre affichee. */
     private int lastVisibleCategory() {
-        return Math.min(categories.size(), firstVisibleCategory() + MAX_VISIBLE_CATEGORIES);
+        return Math.min(categories.size(), firstVisibleCategory() + maxVisibleCategories());
     }
 
     /** Y a-t-il assez de categories pour qu'on ait besoin de defiler ? */
     private boolean categoriesScrollable() {
-        return categories.size() > MAX_VISIBLE_CATEGORIES;
+        return categories.size() > maxVisibleCategories();
     }
 
     /**
@@ -702,7 +767,7 @@ public class CeiItemInfoScreen extends Screen {
      * pour les six onglets -- auquel cas elle se contente de passer dessous.
      */
     private int categoryScrollDownY() {
-        int belowTabs = categoryTabsTop() + (MAX_VISIBLE_CATEGORIES - 1) * 26 + 24;
+        int belowTabs = categoryTabsTop() + (maxVisibleCategories() - 1) * 26 + 24;
         return Math.max(belowTabs, containerY + containerHeight - SCROLL_BTN_H);
     }
 
@@ -901,7 +966,20 @@ public class CeiItemInfoScreen extends Screen {
                     int msgW = this.font.width(emptyMsg);
                     context.drawString(this.font, emptyMsg, contentX + (contentWidth - msgW) / 2, contentY + 40, 0xFFFF0000, false);
                 } else {
-                    drawRecipeContent(context, mouseX, mouseY, contentX, contentY, contentWidth, contentHeight);
+                    // La recette est servie d'abord ; le texte de l'item prend
+                    // ce qui reste. La hauteur amputee est bien celle passee a
+                    // drawRecipeContent, donc les dispositions qui se centrent
+                    // verticalement (le brassage) se centrent dans la place
+                    // qu'elles ont reellement.
+                    int descH = descBandHeight(contentHeight);
+                    drawRecipeContent(context, mouseX, mouseY, contentX, contentY,
+                            contentWidth, contentHeight - descH);
+                    if (descH > 0) {
+                        drawItemDescription(context, contentX,
+                                contentY + contentHeight - descH, contentWidth, descH);
+                    } else {
+                        descBandH = 0;
+                    }
                 }
                 break;
             }
@@ -1037,8 +1115,8 @@ public class CeiItemInfoScreen extends Screen {
 
                 // Plus button for crafting table auto-transfer
                 if (isParentCraftingTable()) {
-                    int plusX = arrowX + 3;
-                    int plusY = arrowY + 12;
+                    int plusX = plusButtonX();
+                    int plusY = plusButtonY();
 
                     boolean hoverPlus = mouseX >= plusX && mouseX < plusX + 12 && mouseY >= plusY && mouseY < plusY + 12;
 
@@ -1559,8 +1637,8 @@ public class CeiItemInfoScreen extends Screen {
             int gridStartY = containerY + 28 + 18;
             int arrowX = gridStartX + 65;
             int arrowY = gridStartY + 22;
-            int plusX = arrowX + 3;
-            int plusY = arrowY + 12;
+            int plusX = plusButtonX();
+            int plusY = plusButtonY();
 
             if (mouseX >= plusX && mouseX < plusX + 12 && mouseY >= plusY && mouseY < plusY + 12) {
                 String title = CeiText.t("cei.craft.fill");
@@ -1574,11 +1652,196 @@ public class CeiItemInfoScreen extends Screen {
         }
     }
 
+
+
+    /**
+     * Position du bouton "+", pour le dessin ET pour le clic.
+     *
+     * Elle etait refaite a trois endroits, a partir de reperes differents. Un
+     * bouton qui se dessine a un endroit et se clique a un autre est
+     * indetectable a la lecture : il faut l'essayer pour s'en apercevoir.
+     */
+    private int plusButtonX() {
+        return containerX + 15 + 10 + 65 + 3;
+    }
+
+    private int plusButtonY() {
+        // +10 : le bouton collait a la fleche.
+        return containerY + 28 + 18 + 22 + 12 + 10;
+    }
+
     private boolean isParentCraftingTable() {
         if (this.parentScreen instanceof net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?> handledScreen) {
             return handledScreen.getMenu() instanceof net.minecraft.world.inventory.CraftingMenu;
         }
         return false;
+    }
+
+    /**
+     * Source unique de la geometrie de la fiche : taille et position sont
+     * calculees ici, au rendu comme avant tout test de clic. Tant que les
+     * deux passent par cette methode, ils ne peuvent pas diverger.
+     */
+    private void syncCardGeometry(com.ceketrum.cei.data.PinnedRecipeManager.PinnedCard card) {
+        this.containerWidth = card != null
+                ? card.getCardWidth()
+                : com.ceketrum.cei.data.PinnedRecipeManager.PinnedCard.DEFAULT_WIDTH;
+        this.containerHeight = card != null
+                ? card.getCardHeight()
+                : com.ceketrum.cei.data.PinnedRecipeManager.PinnedCard.DEFAULT_HEIGHT;
+        int currentXOffset = card != null ? (int) card.getxOffset() : 0;
+        int currentYOffset = card != null ? (int) card.getyOffset() : 0;
+        this.containerX = (this.width - this.containerWidth) / 2 + currentXOffset;
+        this.containerY = (this.height - this.containerHeight) / 2 + currentYOffset;
+    }
+
+    /**
+     * Nombre d'onglets de categorie tenant dans la colonne, calcule sur la
+     * hauteur de la fiche.
+     *
+     * La place des deux boutons de defilement est toujours retiree, meme
+     * quand ils ne sont pas affiches : sinon ce nombre dependrait de
+     * categoriesScrollable(), qui depend de lui.
+     */
+    private int maxVisibleCategories() {
+        int band = containerHeight - 2 * (SCROLL_BTN_H + 2);
+        return Math.max(3, (band + 4) / 26);
+    }
+
+    /**
+     * Les lignes d'infobulle d'un item, en texte brut, telles que le jeu les
+     * produirait -- description du mod comprise.
+     *
+     * La premiere ligne est le nom : elle est sautee, il est deja affiche en
+     * titre partout ou cette methode sert. Les lignes techniques (identifiant,
+     * nombre de composants) ne sont produites par le jeu que si les infobulles
+     * avancees sont actives : il n'y a donc rien a filtrer, F3+H suffit a les
+     * faire apparaitre ou disparaitre.
+     *
+     * STATIQUE, et posee sur une sous-classe de Screen a dessein : c'est la
+     * seule position d'ou l'appel a getTooltipFromItem compile quel que soit
+     * son niveau d'acces dans la lignee visee.
+     */
+    public static String itemTooltipText(ItemStack stack, int maxLines) {
+        if (stack == null || stack.isEmpty()) return "";
+        StringBuilder out = new StringBuilder();
+        int kept = 0;
+
+        // Avec les infobulles avancees (F3+H), le jeu ajoute en queue
+        // l'identifiant de l'item puis son nombre de composants. On coupe des
+        // l'identifiant : sa valeur se calcule au caractere pres depuis le
+        // registre, donc le repere ne depend d'aucune traduction -- alors que
+        // "6 component(s)" vient d'une cle traduite. Tout ce qui suit tombe
+        // avec, et la durabilite, placee avant, est conservee.
+        String idLine = "";
+        try {
+            var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
+            if (id != null) idLine = id.toString();
+        } catch (Exception e) {
+            // Registre indisponible : mieux vaut tout garder que rien.
+        }
+
+        try {
+            var lines = getTooltipFromItem(Minecraft.getInstance(), stack);
+            for (int i = 1; i < lines.size() && kept < maxLines; i++) {
+                String line = lines.get(i).getString();
+                if (line == null) continue;
+                line = line.trim();
+                if (line.isEmpty()) continue;
+                if (!idLine.isEmpty() && line.equals(idLine)) break;
+                if (kept > 0) out.append('\n');
+                out.append(line);
+                kept++;
+            }
+        } catch (Exception e) {
+            // Une infobulle moddee qui leve ne doit pas emporter le rendu de
+            // toute la fiche.
+            return "";
+        }
+        return out.toString();
+    }
+
+    /**
+     * Hauteur reservee au texte de l'item, sous la recette.
+     *
+     * Elle ne prend que ce qui reste une fois la recette servie, et jamais
+     * plus de la moitie de la zone. C'est ce qui donne enfin un usage a la
+     * hauteur gagnee en agrandissant la fiche.
+     */
+    private int descBandHeight(int contentHeight) {
+        int free = contentHeight - RECIPE_MIN_H;
+        if (free < 20) return 0;
+        return Math.min(free, contentHeight / 2);
+    }
+
+    /**
+     * Dessine le texte de l'item dans la bande, coupe au ciseau.
+     *
+     * La hauteur totale n'est pas estimee : elle est celle que le dessin a
+     * reellement produite, drawWrappedText rendant le Y d'arrivee. Mesure et
+     * dessin ne peuvent donc pas diverger.
+     */
+    private void drawItemDescription(GuiGraphics context, int x, int y, int w, int h) {
+        String text = itemTooltipText(this.targetStack, DESC_MAX_LINES);
+        if (text.isEmpty()) {
+            descBandH = 0;
+            descTotalH = 0;
+            return;
+        }
+
+        descBandX = x;
+        descBandY = y;
+        descBandW = w;
+        descBandH = h;
+
+        int maxScroll = Math.max(0, descTotalH - h);
+        if (descScroll > maxScroll) descScroll = maxScroll;
+        if (descScroll < 0) descScroll = 0;
+
+        // Un filet separe la recette du texte : colles, les deux blocs se
+        // lisent comme un seul.
+        context.fill(x, y - 5, x + w, y - 4, 0x22FFFFFF);
+
+        context.enableScissor(x, y, x + w, y + h);
+        int end = TextRenderHelper.drawWrappedText(context, text, x, y - descScroll, w,
+                0xDDFFFFFF, 0.75f, 0, this.font);
+        context.disableScissor();
+        descTotalH = end - (y - descScroll);
+    }
+
+    /**
+     * Molette sur la zone de texte.
+     *
+     * Bornee par ce que le dessin a pose, et rendue seulement si le texte
+     * deborde reellement : sinon la liste d'items defilerait derriere alors
+     * qu'on visait manifestement ce bloc.
+     */
+    private boolean descriptionWheel(double mouseX, double mouseY, double amount) {
+        if (descBandH <= 0 || descTotalH <= descBandH) return false;
+        if (mouseX < descBandX || mouseX >= descBandX + descBandW) return false;
+        if (mouseY < descBandY || mouseY >= descBandY + descBandH) return false;
+
+        int maxScroll = descTotalH - descBandH;
+        descScroll -= (int) Math.signum(amount) * 12;
+        if (descScroll < 0) descScroll = 0;
+        if (descScroll > maxScroll) descScroll = maxScroll;
+        return true;
+    }
+
+    /** Coin haut-gauche de la poignee, logee dans le coin bas-droit de la fiche. */
+    private int resizeGripX() {
+        return containerX + containerWidth - RESIZE_GRIP - 1;
+    }
+
+    private int resizeGripY() {
+        return containerY + containerHeight - RESIZE_GRIP - 1;
+    }
+
+    private boolean isOverResizeGrip(double mouseX, double mouseY) {
+        int gx = resizeGripX();
+        int gy = resizeGripY();
+        return mouseX >= gx && mouseX < gx + RESIZE_GRIP
+            && mouseY >= gy && mouseY < gy + RESIZE_GRIP;
     }
 
     public boolean isMouseOverCard(double mouseX, double mouseY) {
@@ -1610,6 +1873,10 @@ public class CeiItemInfoScreen extends Screen {
         var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
         var card = manager.getPinnedCard(this.targetStack);
         boolean isPinned = card != null;
+
+        // La fiche a pu etre redimensionnee depuis la derniere image : on
+        // recalcule la geometrie avant le moindre test de position.
+        syncCardGeometry(card);
 
         // 0. Header buttons click handling
         int pinX = containerX + 6;
@@ -1648,6 +1915,14 @@ public class CeiItemInfoScreen extends Screen {
             }
         }
 
+        // Poignee de redimensionnement. Testee avant la barre de titre et
+        // avant le contenu : sinon un clic dans le coin tomberait sur un slot.
+        if (isPinned && isOverResizeGrip(mouseX, mouseY)) {
+            manager.bringToFront(card);
+            card.beginResize(containerX, containerY);
+            return true;
+        }
+
         // Dragging Detection
         if (mouseX >= containerX && mouseX < containerX + containerWidth && mouseY >= containerY && mouseY < containerY + 20) {
             if (card != null) {
@@ -1666,8 +1941,8 @@ public class CeiItemInfoScreen extends Screen {
             int gridStartY = containerY + 28 + 18;
             int arrowX = gridStartX + 65;
             int arrowY = gridStartY + 22;
-            int plusX = arrowX + 3;
-            int plusY = arrowY + 12;
+            int plusX = plusButtonX();
+            int plusY = plusButtonY();
 
             if (mouseX >= plusX && mouseX < plusX + 12 && mouseY >= plusY && mouseY < plusY + 12) {
                 net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?> handledScreen = (net.minecraft.client.gui.screens.inventory.AbstractContainerScreen<?>) this.parentScreen;
@@ -1702,6 +1977,7 @@ public class CeiItemInfoScreen extends Screen {
             if (mouseX >= tabX && mouseX < tabX + 24 && mouseY >= tabY && mouseY < tabY + 22) {
                 activeMainTab = tab;
                 updateCategories();
+                descScroll = 0;
                 updatePinnedState();
                 Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
                 return true;
@@ -1738,6 +2014,7 @@ public class CeiItemInfoScreen extends Screen {
                 if (categoryTabHit(tabX, tabY, mouseX, mouseY)) {
                     activeCategory = cat;
                     currentPage = 0;
+                    descScroll = 0;
                     updatePinnedState();
                     Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
                     return true;
@@ -1786,6 +2063,21 @@ public class CeiItemInfoScreen extends Screen {
     public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double deltaX, double deltaY) {
         var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
         var card = manager.getPinnedCard(this.targetStack);
+        if (card != null && card.isResizing()) {
+            // Le coin haut-gauche reste fige, le coin bas-droit suit la souris
+            // au pixel : pas d'amortissement, la fiche ne traine pas derriere
+            // le curseur. La taille est bornee pour rester dans la fenetre.
+            int anchorX = card.getResizeAnchorX();
+            int anchorY = card.getResizeAnchorY();
+            card.resizeBy(deltaX, deltaY, this.width - anchorX, this.height - anchorY);
+
+            // Meme expression que dans syncCardGeometry, division entiere
+            // comprise : l'offset recalcule redonne exactement anchorX/anchorY.
+            card.setxOffset(anchorX - (this.width - card.getCardWidth()) / 2);
+            card.setyOffset(anchorY - (this.height - card.getCardHeight()) / 2);
+            syncCardGeometry(card);
+            return true;
+        }
         if (card != null && card.isDragging()) {
             double newXOffset = card.getxOffset() + deltaX;
             double newYOffset = card.getyOffset() + deltaY;
@@ -1809,8 +2101,9 @@ public class CeiItemInfoScreen extends Screen {
 
         var manager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
         var card = manager.getPinnedCard(this.targetStack);
-        if (card != null && card.isDragging()) {
+        if (card != null && (card.isDragging() || card.isResizing())) {
             card.setDragging(false);
+            card.setResizing(false);
             return true;
         }
         return super.mouseReleased(event);
@@ -1867,6 +2160,7 @@ public class CeiItemInfoScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         if (categoryWheel(mouseX, mouseY, verticalAmount)) return true;
+        if (descriptionWheel(mouseX, mouseY, verticalAmount)) return true;
         if (this.ceiModule != null) {
             float animationSlideOffset = this.ceiModule.getPanelRenderer().getAnimationSlideOffset();
             if (this.ceiModule.handleMouseScroll(mouseX, mouseY, verticalAmount, this.width, this.height, this.font, animationSlideOffset)) {

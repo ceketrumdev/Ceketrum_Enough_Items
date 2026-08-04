@@ -263,5 +263,11 @@
   "cei.machine.unknown": "Неизвестная машина",
   "cei.recipe.generic": "Рецепт",
   "gui.cei.filters": "Фильтры",
-  "gui.cei.filters.clear": "Очистить всё"
+  "gui.cei.filters.clear": "Очистить всё",
+  "gui.cei.search.help.title": "Префиксы поиска",
+  "gui.cei.search.help.mod": "@mod — предметы одного мода",
+  "gui.cei.search.help.desc": "$текст — поиск по описаниям",
+  "gui.cei.search.help.regex": "^выраж — регулярное выражение",
+  "gui.cei.search.help.combine": "@mod текст — оба сразу",
+  "gui.cei.search.help.tag": "#тег — предметы из тега"
 }

@@ -263,5 +263,11 @@
   "cei.machine.unknown": "Máquina desconocida",
   "cei.recipe.generic": "Receta",
   "gui.cei.filters": "Filtros",
-  "gui.cei.filters.clear": "Borrar todo"
+  "gui.cei.filters.clear": "Borrar todo",
+  "gui.cei.search.help.title": "Prefijos de búsqueda",
+  "gui.cei.search.help.mod": "@mod - objetos de un mod",
+  "gui.cei.search.help.desc": "$texto - busca en las descripciones",
+  "gui.cei.search.help.regex": "^expr - expresión regular",
+  "gui.cei.search.help.combine": "@mod texto - ambos a la vez",
+  "gui.cei.search.help.tag": "#tag - objetos de una etiqueta"
 }

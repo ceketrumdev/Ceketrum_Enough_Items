@@ -263,5 +263,11 @@
   "cei.machine.unknown": "未知机器",
   "cei.recipe.generic": "配方",
   "gui.cei.filters": "筛选",
-  "gui.cei.filters.clear": "全部清除"
+  "gui.cei.filters.clear": "全部清除",
+  "gui.cei.search.help.title": "搜索前缀",
+  "gui.cei.search.help.mod": "@mod — 某个模组的物品",
+  "gui.cei.search.help.desc": "$文本 — 搜索描述",
+  "gui.cei.search.help.regex": "^表达式 — 正则表达式",
+  "gui.cei.search.help.combine": "@mod 文本 — 两者同时",
+  "gui.cei.search.help.tag": "#标签 — 某个标签的物品"
 }

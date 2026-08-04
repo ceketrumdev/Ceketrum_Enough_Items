@@ -88,10 +88,30 @@ public final class CeiDiagnostics {
 
     private static final Map<String, Acc> FRAMES = new ConcurrentHashMap<>();
 
+    /** Duree ecoulee depuis begin(), en nanosecondes. 0 si la sonde est eteinte. */
+    public static long since(long t0) {
+        return (ENABLED && t0 != 0L) ? System.nanoTime() - t0 : 0L;
+    }
+
+    /**
+     * Comme frame(), mais pour une duree deja cumulee.
+     *
+     * Sert aux mesures faites DANS une boucle : on additionne le temps de
+     * chaque tour, et on ne publie qu'une fois par image. Chronometrer chaque
+     * tour separement noierait la synthese.
+     */
+    public static void frameNanos(String label, long nanos) {
+        if (!ENABLED || nanos <= 0L) return;
+        accumulate(label, nanos);
+    }
+
     /** Agrege une duree par frame et publie une synthese toutes les 5 secondes. */
     public static void frame(String label, long t0) {
         if (!ENABLED || t0 == 0L) return;
-        long dt = System.nanoTime() - t0;
+        accumulate(label, System.nanoTime() - t0);
+    }
+
+    private static void accumulate(String label, long dt) {
         Acc a = FRAMES.computeIfAbsent(label, k -> new Acc());
         synchronized (a) {
             a.count++;
@@ -113,6 +133,30 @@ public final class CeiDiagnostics {
             a.totalNanos = 0;
             a.maxNanos = 0;
             a.lastReport = now;
+        }
+    }
+
+    // ------------------------------------------------------------- grandeurs
+
+    private static final Map<String, long[]> GAUGES = new ConcurrentHashMap<>();
+
+    /**
+     * Grandeur relevee par image, publiee toutes les 5 secondes.
+     *
+     * Sans elle, une moyenne en millisecondes ne dit pas si le cout vient du
+     * travail par element ou du nombre d'elements.
+     */
+    public static void gauge(String label, long value) {
+        if (!ENABLED) return;
+        long[] g = GAUGES.computeIfAbsent(label, k -> new long[3]); // somme, n, dernier rapport
+        synchronized (g) {
+            g[0] += value;
+            g[1]++;
+            long now = System.currentTimeMillis();
+            if (g[2] == 0L) { g[2] = now; return; }
+            if (now - g[2] < REPORT_INTERVAL_MS) return;
+            LOGGER.info("{} : {} en moyenne", label, g[1] == 0 ? 0 : g[0] / g[1]);
+            g[0] = 0; g[1] = 0; g[2] = now;
         }
     }
 

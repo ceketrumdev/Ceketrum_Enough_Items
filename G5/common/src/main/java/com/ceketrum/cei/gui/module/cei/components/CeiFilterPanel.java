@@ -106,6 +106,13 @@ public class CeiFilterPanel {
         }
     }
 
+    /** Les identifiants de mods presents, pour la completion. */
+    public List<String> modIds() {
+        List<String> out = new ArrayList<>(mods.size());
+        for (Entry e : mods) out.add(e.key);
+        return out;
+    }
+
     public boolean isActive() {
         return !selectedMods.isEmpty();
     }

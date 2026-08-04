@@ -24,6 +24,18 @@ public class RecipePopupRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger("cei-recipe-popup");
     private final Map<ResourceLocation, Long> popupOpenTimes = new HashMap<>(); 
     private final Map<ResourceLocation, Boolean> animationCompleted = new HashMap<>(); 
+    /**
+     * Texte d'infobulle de l'item survole.
+     *
+     * Range dans un champ plutot que passe en parametre : le calcul de hauteur
+     * et le dessin lisent ainsi rigoureusement la meme chaine. Les deux ayant
+     * diverge par le passe sur d'autres blocs, la fenetre finissait trop
+     * courte pour son contenu.
+     */
+    private String modTooltip = "";
+    /** Au-dela, la fenetre de survol deviendrait plus haute que l'ecran. */
+    private static final int POPUP_TOOLTIP_LINES = 6;
+
     private int currentPopupX = 0;
     private int currentPopupY = 0;
     private static final int POPUP_ANIMATION_DURATION = 180; // ms
@@ -139,6 +151,15 @@ public class RecipePopupRenderer {
             int lines = calculateWrappedTextLines(itemDescription, descMaxWidth, scale, textRenderer);
             height += lines * ((int)(textRenderer.lineHeight * scale) + 2);
         }
+
+        // Texte de l'item, compte exactement comme il sera dessine.
+        if (!modTooltip.isEmpty()) {
+            height += 8; // Marge
+            int tipMaxWidth = GuiConstants.POPUP_WIDTH - 20;
+            float scale = 0.75F;
+            int tipLines = calculateWrappedTextLines(modTooltip, tipMaxWidth, scale, textRenderer);
+            height += tipLines * ((int)(textRenderer.lineHeight * scale) + 2);
+        }
         
         // Stats
         boolean hasAnyStats = stats.hasDurability || stats.hasFood || stats.hasAttackDamage || stats.hasAttackSpeed || stats.hasArmor || stats.hasToughness;
@@ -169,6 +190,10 @@ public class RecipePopupRenderer {
         ResourceLocation itemId = com.ceketrum.cei.data.FavoriteItemsManager.getUniqueItemId(stack);
         
         String itemDescription = ItemDescriptionManager.getInstance().getDescription(stack.getItem());
+        // Releve AVANT calculatePopupHeight : c'est lui qui doit compter ces
+        // lignes, sinon la fenetre serait trop courte pour ce qu'elle dessine.
+        this.modTooltip = com.ceketrum.cei.gui.screen.CeiItemInfoScreen
+                .itemTooltipText(stack, POPUP_TOOLTIP_LINES);
         ItemStats stats = getItemStats(stack);
         
         int popupHeight = calculatePopupHeight(itemDescription, stats, textRenderer);
@@ -285,6 +310,16 @@ public class RecipePopupRenderer {
             int descColor = (int) (0xDD * alpha) << 24 | 0xDDDDDD;
             currentY = TextRenderHelper.drawWrappedText(context, itemDescription, startX + 10, currentY, 
                                                         descMaxWidth, descColor, scale, 4, textRenderer);
+        }
+
+        // Draw item tooltip text
+        if (!modTooltip.isEmpty()) {
+            currentY += 4;
+            int tipMaxWidth = GuiConstants.POPUP_WIDTH - 20;
+            float tipScale = 0.75F;
+            int tipColor = (int) (0xDD * alpha) << 24 | 0xAAAAAA;
+            currentY = TextRenderHelper.drawWrappedText(context, modTooltip, startX + 10, currentY,
+                                                        tipMaxWidth, tipColor, tipScale, 0, textRenderer);
         }
         
         // Draw Stats Separator

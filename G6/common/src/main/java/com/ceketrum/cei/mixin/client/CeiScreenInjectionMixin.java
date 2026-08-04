@@ -162,7 +162,7 @@ public abstract class CeiScreenInjectionMixin extends Screen {
 
         var pinnedManager = com.ceketrum.cei.data.PinnedRecipeManager.getInstance();
         for (var card : pinnedManager.getPinnedCards()) {
-            if (card.isDragging()) {
+            if (card.isDragging() || card.isResizing()) {
                 var pinnedScreen = card.getScreenInstance();
                 if (pinnedScreen != null) {
                     if (pinnedScreen.mouseDragged(event, deltaX, deltaY)) {
@@ -200,7 +200,7 @@ public abstract class CeiScreenInjectionMixin extends Screen {
         
         // 1. Release dragging state globally on RELEASE action
         for (var card : pinnedManager.getPinnedCards()) {
-            if (card.isDragging()) {
+            if (card.isDragging() || card.isResizing()) {
                 var pinnedScreen = card.getScreenInstance();
                 if (pinnedScreen != null) {
                     pinnedScreen.mouseReleased(event);

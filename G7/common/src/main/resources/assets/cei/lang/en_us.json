@@ -263,5 +263,11 @@
   "cei.machine.unknown": "Unknown Machine",
   "cei.recipe.generic": "Recipe",
   "gui.cei.filters": "Filters",
-  "gui.cei.filters.clear": "Clear all"
+  "gui.cei.filters.clear": "Clear all",
+  "gui.cei.search.help.title": "Search prefixes",
+  "gui.cei.search.help.mod": "@mod - items from one mod",
+  "gui.cei.search.help.desc": "$text - search descriptions",
+  "gui.cei.search.help.regex": "^expr - regular expression",
+  "gui.cei.search.help.combine": "@mod text - both at once",
+  "gui.cei.search.help.tag": "#tag - items in a tag"
 }

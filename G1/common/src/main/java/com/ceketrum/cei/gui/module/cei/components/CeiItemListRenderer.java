@@ -249,20 +249,36 @@ public class CeiItemListRenderer {
             float glowAlpha = 0.0f;
 
             // Détecter les changements d'état du survol pour les logs (seulement si l'item est actuellement survolé ou l'était récemment)
-            Boolean lastHovered = lastHoverState.get(itemId);
-            boolean hoverStateChanged = (lastHovered == null) || (lastHovered != isHovered);
-
-            // Ne logger que si l'item est actuellement survolé, a un cache, ou était récemment survolé
-            boolean shouldLog = isHovered || cachedHoverScale.containsKey(itemId) || hoverStartTimes.containsKey(itemId) || unhoverStartTimes.containsKey(itemId);
-
-            if (hoverStateChanged && shouldLog && DEBUG_ANIMATION) {
-                lastHoverState.put(itemId, isHovered);
-                LOGGER.info("[HOVER STATE] Item: {} | isHovered: {} -> {} | Cache: scale={}, alpha={} | hoverStartTimes: {} | unhoverStartTimes: {}",
-                    itemId, lastHovered, isHovered,
-                    cachedHoverScale.get(itemId), cachedGlowAlpha.get(itemId),
-                    hoverStartTimes.containsKey(itemId), unhoverStartTimes.containsKey(itemId));
-            } else if (hoverStateChanged) {
-                lastHoverState.put(itemId, isHovered);
+            // Tout ce bloc n'existe que pour la journalisation de mise au
+            // point. hoverStateChanged n'est lu que dans des conditions
+            // contenant DEBUG_ANIMATION ; lastHoverState et shouldLog n'ont
+            // pas d'autre role que d'alimenter ce reperage.
+            //
+            // DEBUG_ANIMATION etant faux, on payait quatre recherches de table
+            // -- et parfois une ecriture -- par case et par image, pour des
+            // journaux qui ne sortent jamais. lastHoverState grossissait en
+            // outre sans fin : cleanupFinishedAnimations ne purge que
+            // favoriteToggleTimes.
+            //
+            // Remettre DEBUG_ANIMATION a vrai redonne l'ancien comportement.
+            boolean shouldLog = false;
+            boolean hoverStateChanged = false;
+            if (DEBUG_ANIMATION) {
+                Boolean lastHovered = lastHoverState.get(itemId);
+                hoverStateChanged = (lastHovered == null) || (lastHovered != isHovered);
+                shouldLog = isHovered
+                        || cachedHoverScale.containsKey(itemId)
+                        || hoverStartTimes.containsKey(itemId)
+                        || unhoverStartTimes.containsKey(itemId);
+                if (hoverStateChanged) {
+                    lastHoverState.put(itemId, isHovered);
+                    if (shouldLog) {
+                        LOGGER.info("[HOVER STATE] Item: {} | isHovered: {} -> {} | Cache: scale={}, alpha={} | hoverStartTimes: {} | unhoverStartTimes: {}",
+                            itemId, lastHovered, isHovered,
+                            cachedHoverScale.get(itemId), cachedGlowAlpha.get(itemId),
+                            hoverStartTimes.containsKey(itemId), unhoverStartTimes.containsKey(itemId));
+                    }
+                }
             }
 
             if (isHovered) {
@@ -396,7 +412,11 @@ public class CeiItemListRenderer {
             }
 
             // Icône étoile pour les favoris (rendue APRÈS l'item pour être au-dessus)
-            boolean isFavorite = favoriteManager.isFavorite(stack);
+            // itemId vient d'etre calcule pour cette case. Passer par
+            // isFavorite(stack) refaisait getUniqueItemId() : une recherche de
+            // registre et une lecture de composants de plus, par case et par
+            // image, pour retrouver une valeur deja en main.
+            boolean isFavorite = favoriteManager.isFavorite(itemId);
             if (isFavorite) {
                 String starIcon = "★";
                 int starX = x + GuiConstants.SLOT_SIZE - 10;
