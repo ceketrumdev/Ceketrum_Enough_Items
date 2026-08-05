@@ -78,6 +78,9 @@ public class BrewingRecipeManager {
      *     mix(ingredient, potion)      --  lit POTION_CONTENTS sur le 2e
      */
     public synchronized void ensureCacheBuilt() {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureBrewing()) return;
+
         if (isCacheBuilt) {
             return;
         }
@@ -181,6 +184,9 @@ public class BrewingRecipeManager {
      * Trouve les recettes de brassage qui produisent l'ItemStack specifie.
      */
     public List<BrewingRecipe> getRecipesForOutput(ItemStack output) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureBrewing()) return java.util.List.of();
+
         ensureCacheBuilt();
         Identifier outputId = FavoriteItemsManager.getUniqueItemId(output);
         return cache.getOrDefault(outputId, Collections.emptyList());
@@ -190,6 +196,9 @@ public class BrewingRecipeManager {
      * Trouve les recettes de brewing qui utilisent l'ItemStack spécifié comme ingrédient ou potion d'entrée.
      */
     public List<BrewingRecipe> getRecipesForInput(ItemStack input) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureBrewing()) return java.util.List.of();
+
         ensureCacheBuilt();
         List<BrewingRecipe> list = new ArrayList<>();
         

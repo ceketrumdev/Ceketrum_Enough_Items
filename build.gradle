@@ -7,7 +7,7 @@ allprojects {
 	apply plugin: 'eclipse'
 	
 	group = 'com.ceketrum'
-	version = '0.1.4'
+	version = '0.1.5'
 
 	// Load parent group properties if they exist
 	def parentDir = project.parent ? project.parent.projectDir : project.projectDir

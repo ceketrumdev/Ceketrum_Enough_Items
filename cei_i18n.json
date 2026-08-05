@@ -1,0 +1,1922 @@
+[
+ {
+  "file": "config/CeiConfig.java",
+  "line": 69,
+  "kind": "literal",
+  "fr": "Impossible de créer le dossier de configuration",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "config/CeiConfig.java",
+  "line": 87,
+  "kind": "literal",
+  "fr": "Fichier de configuration non trouvé, utilisation des valeurs par défaut",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "config/CeiConfig.java",
+  "line": 126,
+  "kind": "literal",
+  "fr": "Configuration chargée depuis {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "config/CeiConfig.java",
+  "line": 167,
+  "kind": "literal",
+  "fr": "Configuration sauvegardée dans {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "config/CeiConfig.java",
+  "line": 187,
+  "kind": "literal",
+  "fr": "Couleur invalide: {}, utilisation de la valeur par défaut",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 56,
+  "kind": "literal",
+  "fr": "[BLOCKGEN] Client en multijoueur, skip du scan dynamique (fallbacks locaux activés).",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 105,
+  "kind": "literal",
+  "fr": "[BLOCKGEN] Scan dynamique terminé en {} ms. {} biomes scannés, {} blocs indexés.",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 109,
+  "kind": "literal",
+  "fr": "[BLOCKGEN] Erreur lors du scan de génération de blocs: {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 233,
+  "kind": "literal",
+  "fr": "Désert",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 234,
+  "kind": "literal",
+  "fr": "Forêt",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 235,
+  "kind": "literal",
+  "fr": "Taïga",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 237,
+  "kind": "literal",
+  "fr": "Rivière",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 238,
+  "kind": "literal",
+  "fr": "Océan",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 242,
+  "kind": "literal",
+  "fr": "Pentes enneigées",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 245,
+  "kind": "literal",
+  "fr": "Forêt de Cerisiers",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 246,
+  "kind": "literal",
+  "fr": "Abîmes obscures (Deep Dark)",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 247,
+  "kind": "literal",
+  "fr": "Marais à Mangroves",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 249,
+  "kind": "literal",
+  "fr": "Grottes de spéléothèmes",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 251,
+  "kind": "literal",
+  "fr": "Forêt carmin",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 252,
+  "kind": "literal",
+  "fr": "Forêt distordue",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 253,
+  "kind": "literal",
+  "fr": "Vallée des Âmes",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 254,
+  "kind": "literal",
+  "fr": "Désolations du Nether",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 276,
+  "kind": "literal",
+  "fr": "Génération Biomes (",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 313,
+  "kind": "pair",
+  "fr": "Génération : Tous les biomes montagneux et souterrains",
+  "en": "Generation: All mountainous and underground biomes",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 314,
+  "kind": "pair",
+  "fr": "Altitudes Y : Y=0 à Y=256 (Pic à Y=96 et Y=256)",
+  "en": "Y Levels: Y=0 to Y=256 (Peaks at Y=96 and Y=256)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 318,
+  "kind": "pair",
+  "fr": "Génération : Tous les biomes (Particulièrement les Montagnes et Grottes)",
+  "en": "Generation: All biomes (Especially Mountains and Caves)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 319,
+  "kind": "pair",
+  "fr": "Altitudes Y : Y=-64 à Y=320 (Pics à Y=16 et Y=256)",
+  "en": "Y Levels: Y=-64 to Y=320 (Peaks at Y=16 and Y=256)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 323,
+  "kind": "pair",
+  "fr": "Génération : Tous les biomes (Abondant dans les grottes de spéléothèmes)",
+  "en": "Generation: All biomes (Very abundant in Dripstone Caves)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 324,
+  "kind": "pair",
+  "fr": "Altitudes Y : Y=-16 à Y=112 (Pic à Y=48)",
+  "en": "Y Levels: Y=-16 to Y=112 (Peak at Y=48)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 328,
+  "kind": "pair",
+  "fr": "Génération : Badlands (Terres arides) et tous les souterrains",
+  "en": "Generation: Badlands and all deep undergrounds",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 329,
+  "kind": "pair",
+  "fr": "Badlands : Y=32 à Y=256 / Souterrain : Y=-64 à Y=32",
+  "en": "Badlands: Y=32 to Y=256 / Underground: Y=-64 to Y=32",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 333,
+  "kind": "pair",
+  "fr": "Génération : Très profond sous terre (Tous les biomes)",
+  "en": "Generation: Deep underground in all biomes",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 334,
+  "kind": "pair",
+  "fr": "Altitudes Y : Y=-64 à Y=16 (Abondance accrue vers Y=-64)",
+  "en": "Y Levels: Y=-64 to Y=16 (Increasingly common towards Y=-64)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 338,
+  "kind": "pair",
+  "fr": "Génération : Profond sous terre (Tous les biomes)",
+  "en": "Generation: Deep underground in all biomes",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 339,
+  "kind": "pair",
+  "fr": "Altitudes Y : Y=-64 à Y=64 (Pic à Y=0)",
+  "en": "Y Levels: Y=-64 to Y=64 (Peak at Y=0)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 343,
+  "kind": "pair",
+  "fr": "Génération : Profondeurs extrêmes des Abysses (Deepslate Y < 0)",
+  "en": "Generation: Extreme depths of the Deepslate (Y < 0)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 344,
+  "kind": "pair",
+  "fr": "Altitudes Y : Y=-64 à Y=16 (Abondance maximale à Y=-64)",
+  "en": "Y Levels: Y=-64 to Y=16 (Max abundance at Y=-64)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 348,
+  "kind": "pair",
+  "fr": "Génération : Uniquement sous les biomes de Montagne (Windswept / Peaks)",
+  "en": "Generation: Only under Mountain biomes (Windswept / Peaks)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 349,
+  "kind": "pair",
+  "fr": "Altitudes Y : Y=-16 à Y=320 (Pic à Y=256)",
+  "en": "Y Levels: Y=-16 to Y=320 (Peak at Y=256)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 353,
+  "kind": "pair",
+  "fr": "Génération : Naturellement partout dans le Nether",
+  "en": "Generation: Naturally everywhere in the Nether",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 354,
+  "kind": "pair",
+  "fr": "Altitudes Y : Y=10 à Y=117",
+  "en": "Y Levels: Y=10 to Y=117",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 357,
+  "kind": "pair",
+  "fr": "Génération : Sous-sol très profond du Nether (Masqué sous la lave)",
+  "en": "Generation: Deep underground in the Nether (Hidden under lava)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 358,
+  "kind": "pair",
+  "fr": "Altitudes Y : Y=8 à Y=119 (Pic absolu à Y=15)",
+  "en": "Y Levels: Y=8 to Y=119 (Absolute peak at Y=15)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 366,
+  "kind": "pair",
+  "fr": "Structure : Chambres des Épreuves (Trial Chambers)",
+  "en": "Structure: Trial Chambers",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 367,
+  "kind": "pair",
+  "fr": "Génération : Abysses souterraines abyssales (Y < 0)",
+  "en": "Generation: Deepslate underground (Y < 0)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 373,
+  "kind": "pair",
+  "fr": "Structure : Chambres des Épreuves (Éléments d'éclairage et murs)",
+  "en": "Structure: Trial Chambers (Lighting and structural blocks)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 377,
+  "kind": "pair",
+  "fr": "Structure : Forteresses du Nether",
+  "en": "Structure: Nether Fortresses",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 380,
+  "kind": "pair",
+  "fr": "Génération : Forêt Carmin (Ruines / Nether)",
+  "en": "Generation: Crimson Forest (Nether)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 384,
+  "kind": "pair",
+  "fr": "Biome : Deltas de Basalte (Colonnes volcaniques massives)",
+  "en": "Biome: Basalt Deltas (Massive volcanic columns)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 389,
+  "kind": "pair",
+  "fr": "Biome : Vallée des Âmes, Vestiges de Bastion (Nether)",
+  "en": "Biome: Soul Sand Valley, Bastion Remnants (Nether)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 393,
+  "kind": "pair",
+  "fr": "Biome : Vallée des Âmes (Soul Sand Valley - Nether)",
+  "en": "Biome: Soul Sand Valley (Nether)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 396,
+  "kind": "pair",
+  "fr": "Nether : Pousse sous le plafond rocheux de toutes les zones",
+  "en": "Nether: Grows under the ceiling of all Nether biomes",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 399,
+  "kind": "pair",
+  "fr": "Dimension : L'End (Constitue l'intégralité des îles)",
+  "en": "Dimension: The End (Constitutes all islands)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 403,
+  "kind": "pair",
+  "fr": "Structure : Cités de l'End (Tours et ponts)",
+  "en": "Structure: End Cities (Towers and bridges)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 408,
+  "kind": "pair",
+  "fr": "Structure : Monuments Océaniques (Ocean Monument)",
+  "en": "Structure: Ocean Monuments",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 411,
+  "kind": "pair",
+  "fr": "Structure : Monuments Océaniques (Éléments lumineux)",
+  "en": "Structure: Ocean Monuments (Light sources)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 415,
+  "kind": "pair",
+  "fr": "Structure : Monuments Océaniques (Salles d'éponges secrètes)",
+  "en": "Structure: Ocean Monuments (Secret sponge rooms)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 420,
+  "kind": "pair",
+  "fr": "Biome : Grottes Luxuriantes (Lush Caves)",
+  "en": "Biome: Lush Caves",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 424,
+  "kind": "pair",
+  "fr": "Biome : Grottes de spéléothèmes (Dripstone Caves)",
+  "en": "Biome: Dripstone Caves",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 430,
+  "kind": "pair",
+  "fr": "Biome : Cités Abyssales (Ancient Cities / Deep Dark)",
+  "en": "Biome: Ancient Cities (Deep Dark / Ancient City)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 439,
+  "kind": "pair",
+  "fr": "Biome : Badlands (Terres arides - Stries géologiques colorées)",
+  "en": "Biome: Badlands (Colorful geologic clay layers)",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 443,
+  "kind": "pair",
+  "fr": "Biome : Marais à Mangroves (Mangrove Swamp)",
+  "en": "Biome: Mangrove Swamp",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 448,
+  "kind": "pair",
+  "fr": "Génération : Sous-couche des déserts, Temples du désert",
+  "en": "Generation: Sub-surface of Desert biomes, Desert Temples",
+  "log": false
+ },
+ {
+  "file": "data/BlockGenerationManager.java",
+  "line": 451,
+  "kind": "pair",
+  "fr": "Génération : Sous-couche des Badlands",
+  "en": "Generation: Sub-surface of Badlands",
+  "log": false
+ },
+ {
+  "file": "data/FavoriteItemsManager.java",
+  "line": 38,
+  "kind": "literal",
+  "fr": "Impossible de créer le dossier de configuration",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/FavoriteItemsManager.java",
+  "line": 169,
+  "kind": "literal",
+  "fr": "Fichier de favoris non trouvé, création d'un nouveau fichier",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/FavoriteItemsManager.java",
+  "line": 188,
+  "kind": "literal",
+  "fr": "Chargé {} favoris depuis {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/FavoriteItemsManager.java",
+  "line": 205,
+  "kind": "literal",
+  "fr": "Sauvegardé {} favoris dans {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/ItemDescriptionManager.java",
+  "line": 65,
+  "kind": "literal",
+  "fr": "Fichier trouvé avec le chemin: {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/ItemDescriptionManager.java",
+  "line": 73,
+  "kind": "literal",
+  "fr": "Fichier trouvé avec le chemin alternatif 1: {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/ItemDescriptionManager.java",
+  "line": 82,
+  "kind": "literal",
+  "fr": "Fichier trouvé avec le chemin alternatif 2: {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/ItemDescriptionManager.java",
+  "line": 92,
+  "kind": "literal",
+  "fr": "Fichier trouvé avec ContextClassLoader: {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/ItemDescriptionManager.java",
+  "line": 98,
+  "kind": "literal",
+  "fr": "Fichier de descriptions non trouvé: {} (et chemin alternatif). Utilisation de la langue par défaut (en_us).",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/ItemDescriptionManager.java",
+  "line": 115,
+  "kind": "literal",
+  "fr": "Chargé {} descriptions depuis {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/ItemDescriptionManager.java",
+  "line": 140,
+  "kind": "literal",
+  "fr": "Client non initialisé, chargement de la langue par défaut: en_us",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/ItemDescriptionManager.java",
+  "line": 166,
+  "kind": "literal",
+  "fr": "Aucune description chargée, tentative de rechargement...",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 91,
+  "kind": "literal",
+  "fr": "[LOOT] Client en multijoueur, skip du scan global de loot tables (fallbacks locaux activés).",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 104,
+  "kind": "literal",
+  "fr": "[LOOT] Nombre maximum de tentatives d'accès au serveur atteint en solo. Skip.",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 119,
+  "kind": "literal",
+  "fr": "[LOOT] Début du scan global des loot tables...",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 161,
+  "kind": "literal",
+  "fr": "[LOOT] Scan global terminé en {} ms. {} loot tables scannées, {} items indexés.",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 494,
+  "kind": "literal",
+  "fr": "Activité",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 522,
+  "kind": "pair",
+  "fr": "Coffres de structures (Bastions, Forteresses, Temples du Désert, Mineshafts)",
+  "en": "Structure chests (Bastions, Fortresses, Desert Temples, Mineshafts)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 523,
+  "kind": "pair",
+  "fr": "Minerais de Diamant (Abysses Y < 0)",
+  "en": "Diamond Ore (Deepslate Y < 0)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 527,
+  "kind": "pair",
+  "fr": "Minerais de Débris Antiques (Nether, Y=8 à Y=22)",
+  "en": "Ancient Debris Ore (Nether, Y=8 to Y=22)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 530,
+  "kind": "pair",
+  "fr": "Table de Smithing (Amélioration d'un outil en diamant)",
+  "en": "Smithing Table (Upgrading diamond equipment)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 531,
+  "kind": "pair",
+  "fr": "Coffres de Bastions",
+  "en": "Bastion Remnant chests",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 534,
+  "kind": "pair",
+  "fr": "Looté par les Blazes (Forteresses du Nether)",
+  "en": "Dropped by Blazes (Nether Fortresses)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 537,
+  "kind": "pair",
+  "fr": "Looté par les Endermen",
+  "en": "Dropped by Endermen",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 538,
+  "kind": "pair",
+  "fr": "Troc avec les Piglins (Or)",
+  "en": "Bartering with Piglins (Gold)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 539,
+  "kind": "pair",
+  "fr": "Échange avec les Clercs villageois",
+  "en": "Trading with Clerc villagers",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 542,
+  "kind": "pair",
+  "fr": "Looté par les Slimes (Marécages, Chunks à Slime)",
+  "en": "Dropped by Slimes (Swamps, Slime Chunks)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 543,
+  "kind": "pair",
+  "fr": "Échange avec le Marchand Ambulant",
+  "en": "Trading with Wandering Trader",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 546,
+  "kind": "pair",
+  "fr": "Coffres de structures (Donjons, Bastions, Forteresses)",
+  "en": "Structure chests (Dungeons, Bastions, Fortresses)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 547,
+  "kind": "pair",
+  "fr": "Obtenu par la Pêche",
+  "en": "Obtained by Fishing",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 550,
+  "kind": "pair",
+  "fr": "Coffres de structures, Pêche",
+  "en": "Structure chests, Fishing",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 551,
+  "kind": "pair",
+  "fr": "Échange avec les Bibliothécaires",
+  "en": "Trading with Librarians",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 554,
+  "kind": "pair",
+  "fr": "Looté par le Wither Boss",
+  "en": "Dropped by the Wither Boss",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 557,
+  "kind": "pair",
+  "fr": "Cadre dans les Bateaux de l'End (Cités de l'End)",
+  "en": "Item Frame in End Ships (End Cities)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 560,
+  "kind": "pair",
+  "fr": "Looté par les Évocateurs (Evokers - Raids / Manoirs)",
+  "en": "Dropped by Evokers (Raids / Woodland Mansions)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 563,
+  "kind": "pair",
+  "fr": "Trésors Enfouis (Buried Treasure)",
+  "en": "Buried Treasure chests",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 566,
+  "kind": "pair",
+  "fr": "Looté par les Noyés (Drowned), Pêche",
+  "en": "Dropped by Drowned, Fishing",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 567,
+  "kind": "pair",
+  "fr": "Échange avec le Marchand Ambulant",
+  "en": "Trading with Wandering Trader",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 570,
+  "kind": "pair",
+  "fr": "Monuments Océaniques (Gardien Ancien / Salles d'éponges)",
+  "en": "Ocean Monuments (Elder Guardian / Sponge Rooms)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 573,
+  "kind": "pair",
+  "fr": "Looté par les Squelettes Wither (Forteresses)",
+  "en": "Dropped by Wither Skeletons (Fortresses)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 576,
+  "kind": "pair",
+  "fr": "Vaincre l'Ender Dragon (Haut du portail de retour)",
+  "en": "Defeating the Ender Dragon (On top of exit portal)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 579,
+  "kind": "pair",
+  "fr": "Looté par les Noyés (Drowned)",
+  "en": "Dropped by Drowned",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 582,
+  "kind": "pair",
+  "fr": "Looté par les Araignées, Toiles d'araignées",
+  "en": "Dropped by Spiders, Cobwebs",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 585,
+  "kind": "pair",
+  "fr": "Looté par les Creepers, Sorcières, Ghasts",
+  "en": "Dropped by Creepers, Witches, Ghasts",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 588,
+  "kind": "pair",
+  "fr": "Looté par les Squelettes",
+  "en": "Dropped by Skeletons",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 591,
+  "kind": "pair",
+  "fr": "Looté par les Zombies",
+  "en": "Dropped by Zombies",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 594,
+  "kind": "pair",
+  "fr": "Looté par les Vaches, Chevaux, Lamas",
+  "en": "Dropped by Cows, Horses, Llamas",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 597,
+  "kind": "pair",
+  "fr": "Looté par les Poulets",
+  "en": "Dropped by Chickens",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 600,
+  "kind": "pair",
+  "fr": "Looté par les Poulpes",
+  "en": "Dropped by Squids",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 603,
+  "kind": "pair",
+  "fr": "Looté par les Poulpes Luisants",
+  "en": "Dropped by Glow Squids",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 607,
+  "kind": "pair",
+  "fr": "Looté par les Gardiens (Monuments Océaniques)",
+  "en": "Dropped by Guardians (Ocean Monuments)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 610,
+  "kind": "pair",
+  "fr": "Échanges villageois, Minerais d'Émeraude (Montagnes)",
+  "en": "Villager trades, Emerald Ore (Mountains)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 613,
+  "kind": "pair",
+  "fr": "Coffres des Cités Abyssales (Ancient City)",
+  "en": "Ancient City chests",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 616,
+  "kind": "pair",
+  "fr": "Coffres des Cités Abyssales",
+  "en": "Ancient City chests",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 620,
+  "kind": "pair",
+  "fr": "Un squelette doit tuer un creeper",
+  "en": "A skeleton must shoot and kill a creeper",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 623,
+  "kind": "pair",
+  "fr": "Coffres de Strongholds, Cités Abyssales",
+  "en": "Stronghold or Ancient City chests",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 626,
+  "kind": "pair",
+  "fr": "Fouilles de Ruines du Sentier (Trail Ruins)",
+  "en": "Brushing Trail Ruins suspicious gravel",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 650,
+  "kind": "pair",
+  "fr": "Fouilles des Chambres des Épreuves (Pots Décorés / Vases)",
+  "en": "Trial Chambers excavations (Decorated Pots / Vases)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 653,
+  "kind": "pair",
+  "fr": "Fouilles archéologiques (Gravel/Sable Suspect)",
+  "en": "Archaeological excavations (Suspicious Gravel/Sand)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 656,
+  "kind": "pair",
+  "fr": "Coffres de structures (Donjons, Strongholds, Temples, Cités)",
+  "en": "Structure chests (Dungeons, Strongholds, Temples, Cities)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 657,
+  "kind": "pair",
+  "fr": "Échanges villageois (Bibliothécaires)",
+  "en": "Villager trades (Librarians)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 658,
+  "kind": "pair",
+  "fr": "Pêche, Table d'enchantement",
+  "en": "Fishing, Enchanting table",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 668,
+  "kind": "pair",
+  "fr": "Obtenu en cassant les feuilles de l'arbre correspondant",
+  "en": "Obtained by breaking leaves of the corresponding tree",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 678,
+  "kind": "pair",
+  "fr": "Couper le tronc de l'arbre correspondant",
+  "en": "Chop down the trunk of the corresponding tree",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 681,
+  "kind": "pair",
+  "fr": "Récompense de Coffre-fort des Chambres des Épreuves (Trial Vault)",
+  "en": "Ominous Trial Vault reward (Trial Chambers)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 684,
+  "kind": "pair",
+  "fr": "Looté par les Breezes (Chambres des Épreuves)",
+  "en": "Dropped by Breezes (Trial Chambers)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 722,
+  "kind": "pair",
+  "fr": "Partout dans le monde / Non spécifié",
+  "en": "Everywhere / Not specified",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 733,
+  "kind": "pair",
+  "fr": "Temple du Désert / Desert Pyramid",
+  "en": "Desert Pyramid / Temple du Désert",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 736,
+  "kind": "pair",
+  "fr": "Puits du Désert / Desert Well",
+  "en": "Desert Well / Puits du Désert",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 739,
+  "kind": "pair",
+  "fr": "Mines Abandonnées / Abandoned Mineshaft",
+  "en": "Abandoned Mineshaft / Mines Abandonnées",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 742,
+  "kind": "pair",
+  "fr": "Temple de la Jungle / Jungle Temple",
+  "en": "Jungle Temple / Temple de la Jungle",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 745,
+  "kind": "pair",
+  "fr": "Forteresse Souterraine / Stronghold",
+  "en": "Stronghold / Forteresse Souterraine",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 748,
+  "kind": "pair",
+  "fr": "Vestiges de Bastion / Bastion Remnant",
+  "en": "Bastion Remnant / Vestiges de Bastion",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 751,
+  "kind": "pair",
+  "fr": "Cité Abyssale / Ancient City",
+  "en": "Ancient City / Cité Abyssale",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 754,
+  "kind": "pair",
+  "fr": "Cité de l'End / End City",
+  "en": "End City / Cité de l'End",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 757,
+  "kind": "pair",
+  "fr": "Trésor Enfoui / Buried Treasure",
+  "en": "Buried Treasure / Trésor Enfoui",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 760,
+  "kind": "pair",
+  "fr": "Donjon / Dungeon",
+  "en": "Dungeon / Donjon",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 763,
+  "kind": "pair",
+  "fr": "Manoir en Forêt / Woodland Mansion",
+  "en": "Woodland Mansion / Manoir en Forêt",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 766,
+  "kind": "pair",
+  "fr": "Épave de Bateau / Shipwreck",
+  "en": "Shipwreck / Épave de Bateau",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 769,
+  "kind": "pair",
+  "fr": "Avant-poste de Pillards / Pillager Outpost",
+  "en": "Pillager Outpost / Avant-poste de Pillards",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 772,
+  "kind": "pair",
+  "fr": "Portail Ruiné / Ruined Portal",
+  "en": "Ruined Portal / Portail Ruiné",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 775,
+  "kind": "pair",
+  "fr": "Ruines du Sentier / Trail Ruins",
+  "en": "Trail Ruins / Ruines du Sentier",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 778,
+  "kind": "pair",
+  "fr": "Ruines Océaniques / Ocean Ruins",
+  "en": "Ocean Ruins / Ruines Océaniques",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 781,
+  "kind": "pair",
+  "fr": "Chambres des Épreuves / Trial Chambers",
+  "en": "Trial Chambers / Chambres des Épreuves",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 784,
+  "kind": "pair",
+  "fr": "Forteresse du Nether / Nether Fortress",
+  "en": "Nether Fortress / Forteresse du Nether",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 787,
+  "kind": "pair",
+  "fr": "Monument Océanique / Ocean Monument",
+  "en": "Ocean Monument / Monument Océanique",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 790,
+  "kind": "pair",
+  "fr": "Village",
+  "en": "Village",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 793,
+  "kind": "pair",
+  "fr": "Marais / Swamp",
+  "en": "Swamp / Marais",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 796,
+  "kind": "pair",
+  "fr": "Forêt de Cerisiers / Cherry Grove",
+  "en": "Cherry Grove / Forêt de Cerisiers",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 808,
+  "kind": "pair",
+  "fr": "Sous-sol (Abysses Y < 0)",
+  "en": "Underground (Deepslate Y < 0)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 809,
+  "kind": "pair",
+  "fr": "Temples, Mines, Bastions (Coffres)",
+  "en": "Temples, Mineshafts, Bastions (Chests)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 811,
+  "kind": "pair",
+  "fr": "Nether (Y: 8 à 22)",
+  "en": "The Nether (Y: 8 to 22)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 813,
+  "kind": "pair",
+  "fr": "Vestiges de Bastion (Treasure chests)",
+  "en": "Bastion Remnants (Treasure chests)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 815,
+  "kind": "pair",
+  "fr": "Forteresses du Nether (Blazes)",
+  "en": "Nether Fortresses (Blazes)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 817,
+  "kind": "pair",
+  "fr": "Forêt Distordue (Nether), L'End",
+  "en": "Warped Forest (Nether), The End",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 819,
+  "kind": "pair",
+  "fr": "Bateaux de l'End (Cités de l'End)",
+  "en": "End Ships (End Cities)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 821,
+  "kind": "pair",
+  "fr": "Manoirs en Forêt (Évocateurs), Raids",
+  "en": "Woodland Mansions (Evokers), Raids",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 823,
+  "kind": "pair",
+  "fr": "Trésors Enfouis",
+  "en": "Buried Treasures",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 825,
+  "kind": "pair",
+  "fr": "Chambres des Épreuves",
+  "en": "Trial Chambers",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 827,
+  "kind": "pair",
+  "fr": "Ruines du Sentier, Chambres des Épreuves, Temples (Archéologie)",
+  "en": "Trail Ruins, Trial Chambers, Temples (Archaeology)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 830,
+  "kind": "pair",
+  "fr": "Bastions (Salles des Trésors)",
+  "en": "Bastions (Treasure Rooms)",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 832,
+  "kind": "pair",
+  "fr": "Monuments Océaniques",
+  "en": "Ocean Monuments",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 834,
+  "kind": "pair",
+  "fr": "Avant-postes de Pillards",
+  "en": "Pillager Outposts",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 836,
+  "kind": "pair",
+  "fr": "Épaves de Bateaux",
+  "en": "Shipwrecks",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 838,
+  "kind": "pair",
+  "fr": "Temples de la Jungle",
+  "en": "Jungle Temples",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 840,
+  "kind": "pair",
+  "fr": "Cités Abyssales",
+  "en": "Ancient Cities",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 842,
+  "kind": "pair",
+  "fr": "Cités de l'End",
+  "en": "End Cities",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 844,
+  "kind": "pair",
+  "fr": "Temples, Forts, Chambres des Épreuves",
+  "en": "Temples, Strongholds, Trial Chambers",
+  "log": false
+ },
+ {
+  "file": "data/LootTableSourceManager.java",
+  "line": 847,
+  "kind": "pair",
+  "fr": "Biomes Forêt de Cerisiers (Cherry Grove)",
+  "en": "Cherry Grove biomes",
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/CeiItemListRenderer.java",
+  "line": 127,
+  "kind": "literal",
+  "fr": "[UNHOVER CLEARED] Item: {} | Retiré de unhoverStartTimes (on survole à nouveau)",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/components/CeiItemListRenderer.java",
+  "line": 152,
+  "kind": "literal",
+  "fr": "[ANIMATION START] Item: {} | Démarrage de l'animation à {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/components/CeiItemListRenderer.java",
+  "line": 167,
+  "kind": "literal",
+  "fr": "[ANIMATION COMPLETE] Item: {} | Animation terminée, mise en cache: scale={}, alpha={} | elapsed={}ms",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/components/CeiItemListRenderer.java",
+  "line": 195,
+  "kind": "literal",
+  "fr": "[UNHOVER START] Item: {} | Début du délai avant vidage du cache à {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/components/CeiItemListRenderer.java",
+  "line": 209,
+  "kind": "literal",
+  "fr": "[CACHE CLEARED] Item: {} | Cache vidé après {}ms (délai: {}ms)",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/components/CeiItemListRenderer.java",
+  "line": 221,
+  "kind": "literal",
+  "fr": "[CACHE KEPT] Item: {} | Cache conservé pendant le délai: scale={}, alpha={}, timeSinceUnhover={}ms",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/components/HelpPopupRenderer.java",
+  "line": 100,
+  "kind": "literal",
+  "fr": "Bouton Épingle : Ancrer la fiche",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/HelpPopupRenderer.java",
+  "line": 101,
+  "kind": "literal",
+  "fr": "Reste affichée hors inventaire",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/HelpPopupRenderer.java",
+  "line": 105,
+  "kind": "literal",
+  "fr": "Glisser le titre pour déplacer",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/HelpPopupRenderer.java",
+  "line": 106,
+  "kind": "literal",
+  "fr": "Clic n'importe où : Premier plan",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/HelpPopupRenderer.java",
+  "line": 110,
+  "kind": "literal",
+  "fr": "Clic + : Remplir l'établi (+1)",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/HelpPopupRenderer.java",
+  "line": 116,
+  "kind": "literal",
+  "fr": "Permet un accès rapide à l'item",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/RecipePopupRenderer.java",
+  "line": 304,
+  "kind": "pair",
+  "fr": "Durabilité",
+  "en": "Durability",
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/RecipePopupRenderer.java",
+  "line": 305,
+  "kind": "pair",
+  "fr": "Nourriture",
+  "en": "Food",
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/RecipePopupRenderer.java",
+  "line": 306,
+  "kind": "pair",
+  "fr": "Saturation",
+  "en": "Saturation",
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/RecipePopupRenderer.java",
+  "line": 307,
+  "kind": "pair",
+  "fr": "Dégâts",
+  "en": "Damage",
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/RecipePopupRenderer.java",
+  "line": 308,
+  "kind": "pair",
+  "fr": "Vitesse d'attaque",
+  "en": "Attack Speed",
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/RecipePopupRenderer.java",
+  "line": 309,
+  "kind": "pair",
+  "fr": "Armure",
+  "en": "Armor",
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/components/RecipePopupRenderer.java",
+  "line": 310,
+  "kind": "pair",
+  "fr": "Robustesse",
+  "en": "Toughness",
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/recipe/CustomMachineRecipeRenderer.java",
+  "line": 153,
+  "kind": "literal",
+  "fr": "Mélange",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/recipe/view/CeiRecipeStation.java",
+  "line": 68,
+  "kind": "pair",
+  "fr": "Machine Speciale",
+  "en": "Custom Machine",
+  "log": false
+ },
+ {
+  "file": "gui/module/cei/util/CraftingHelper.java",
+  "line": 32,
+  "kind": "literal",
+  "fr": "[CEI-DEBUG] placeRecipeIngredients appelé - quantity: ",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/util/CraftingHelper.java",
+  "line": 35,
+  "kind": "literal",
+  "fr": "[CEI-DEBUG] Échec: recipe n'est pas une CraftingRecipe",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/util/CraftingHelper.java",
+  "line": 41,
+  "kind": "literal",
+  "fr": "[CEI-DEBUG] Nombre d'ingrédients: ",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/util/CraftingHelper.java",
+  "line": 61,
+  "kind": "literal",
+  "fr": "[CEI-DEBUG] Quantité maximale calculée: ",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/util/CraftingHelper.java",
+  "line": 65,
+  "kind": "literal",
+  "fr": "[CEI-DEBUG] Échec: craftQuantity <= 0",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/util/CraftingHelper.java",
+  "line": 82,
+  "kind": "literal",
+  "fr": "[CEI-DEBUG] Échec: type de recette non reconnu",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/util/ItemVariantGenerator.java",
+  "line": 47,
+  "kind": "literal",
+  "fr": "Impossible de créer un ItemStack pour l'item {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/util/ItemVariantGenerator.java",
+  "line": 79,
+  "kind": "literal",
+  "fr": "Impossible de créer une variante de potion pour {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/module/cei/util/ItemVariantGenerator.java",
+  "line": 89,
+  "kind": "literal",
+  "fr": "Impossible de créer même une potion vide pour {}",
+  "en": null,
+  "log": true
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 290,
+  "kind": "literal",
+  "fr": "Partout dans le monde / Non spécifié",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 605,
+  "kind": "pair",
+  "fr": "Aucune description disponible pour cet item.",
+  "en": "No description available for this item.",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 619,
+  "kind": "pair",
+  "fr": "Statistiques :",
+  "en": "Statistics:",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 627,
+  "kind": "pair",
+  "fr": "Dégâts",
+  "en": "Damage",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 632,
+  "kind": "pair",
+  "fr": "Vitesse d'attaque",
+  "en": "Attack Speed",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 636,
+  "kind": "pair",
+  "fr": "Armure",
+  "en": "Armor",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 640,
+  "kind": "pair",
+  "fr": "Robustesse",
+  "en": "Toughness",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 644,
+  "kind": "pair",
+  "fr": "Nourriture",
+  "en": "Food",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 648,
+  "kind": "pair",
+  "fr": "Durabilité",
+  "en": "Durability",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 668,
+  "kind": "pair",
+  "fr": "Sources d'Obtention :",
+  "en": "Obtaining Sources:",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 686,
+  "kind": "literal",
+  "fr": "Partout dans le monde / Non spécifié",
+  "en": null,
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 699,
+  "kind": "pair",
+  "fr": "Biomes et Structures :",
+  "en": "Biomes and Structures:",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 736,
+  "kind": "pair",
+  "fr": "Table de Craft",
+  "en": "Crafting Table",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 737,
+  "kind": "pair",
+  "fr": "Fourneau",
+  "en": "Furnace",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 738,
+  "kind": "pair",
+  "fr": "Alambic",
+  "en": "Brewing Stand",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 739,
+  "kind": "pair",
+  "fr": "Tailleur de Pierre",
+  "en": "Stonecutter",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 740,
+  "kind": "pair",
+  "fr": "Table de Forgeron",
+  "en": "Smithing Table",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 748,
+  "kind": "pair",
+  "fr": "Machine Spéciale",
+  "en": "Custom Machine",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1094,
+  "kind": "pair",
+  "fr": "Désancrer la recette",
+  "en": "Unpin recipe",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1095,
+  "kind": "pair",
+  "fr": "Ancrer la recette",
+  "en": "Pin recipe",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1105,
+  "kind": "pair",
+  "fr": "Masquer sur l'écran de jeu",
+  "en": "Hide on HUD",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1106,
+  "kind": "pair",
+  "fr": "Afficher sur l'écran de jeu",
+  "en": "Show on HUD",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1115,
+  "kind": "pair",
+  "fr": "Opacité",
+  "en": "Opacity",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1131,
+  "kind": "pair",
+  "fr": "Description & Stats",
+  "en": "Description & Stats",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1132,
+  "kind": "pair",
+  "fr": "Comment Crafter",
+  "en": "How to Craft",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1133,
+  "kind": "pair",
+  "fr": "Usages (Ingrédient)",
+  "en": "Usages (Ingredient)",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1134,
+  "kind": "pair",
+  "fr": "Comment l'obtenir (Loot)",
+  "en": "Obtaining (Loot)",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1135,
+  "kind": "pair",
+  "fr": "Biomes et Structures",
+  "en": "Biomes and Structures",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1151,
+  "kind": "pair",
+  "fr": "Table de Craft",
+  "en": "Crafting Table",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1152,
+  "kind": "pair",
+  "fr": "Cuisson & Fourneau",
+  "en": "Smelting & Furnace",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1153,
+  "kind": "pair",
+  "fr": "Alambic (Potions)",
+  "en": "Brewing Stand",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1154,
+  "kind": "pair",
+  "fr": "Tailleur de Pierre",
+  "en": "Stonecutter",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1155,
+  "kind": "pair",
+  "fr": "Table de Forgeron (Smithing)",
+  "en": "Smithing Table",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1173,
+  "kind": "pair",
+  "fr": "Machine Spéciale (Mod)",
+  "en": "Special Machine (Mod)",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1201,
+  "kind": "pair",
+  "fr": "Remplir la Table de Craft (+)",
+  "en": "Fill Crafting Table (+)",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1202,
+  "kind": "pair",
+  "fr": "Shift + Clic : Remplir au maximum",
+  "en": "Shift + Click: Fill maximum",
+  "log": false
+ },
+ {
+  "file": "gui/screen/CeiItemInfoScreen.java",
+  "line": 1840,
+  "kind": "pair",
+  "fr": "Machine Spéciale",
+  "en": "Custom Machine",
+  "log": false
+ }
+]

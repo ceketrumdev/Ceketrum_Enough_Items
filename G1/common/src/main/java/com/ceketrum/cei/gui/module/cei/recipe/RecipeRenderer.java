@@ -32,6 +32,9 @@ public class RecipeRenderer {
                                     ItemStack hoveredStack,
                                     String itemDescription,
                                     net.minecraft.client.font.TextRenderer textRenderer) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererCrafting()) return startY;
+
         int currentY = craftingRenderer.render(context, startX, startY, recipe, recipeEntry, 
                                               dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
         
@@ -55,6 +58,9 @@ public class RecipeRenderer {
                                   ItemStack hoveredStack,
                                   String itemDescription,
                                   net.minecraft.client.font.TextRenderer textRenderer) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererSmelting()) return startY;
+
         return smeltingRenderer.render(context, startX, startY, recipe, recipeEntry, 
                                       dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
     }
@@ -68,6 +74,9 @@ public class RecipeRenderer {
                                    ItemStack hoveredStack,
                                    String itemDescription,
                                    net.minecraft.client.font.TextRenderer textRenderer) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererSmithing()) return startY;
+
         return smithingRenderer.render(context, startX, startY, recipe, recipeEntry, 
                                       dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
     }
@@ -81,6 +90,9 @@ public class RecipeRenderer {
                                   ItemStack hoveredStack,
                                   String itemDescription,
                                   net.minecraft.client.font.TextRenderer textRenderer) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererBrewing()) return startY;
+
         return brewingRenderer.render(context, startX, startY, recipe, recipeEntry, 
                                      dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
     }
@@ -92,6 +104,9 @@ public class RecipeRenderer {
                                            ItemStack inputPotion, ItemStack ingredient, ItemStack outputPotion,
                                            ItemStack hoveredStack, String itemDescription,
                                            net.minecraft.client.font.TextRenderer textRenderer) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererBrewing()) return startY;
+
         return brewingRenderer.renderFromData(context, startX, startY, inputPotion, ingredient, outputPotion,
                                              hoveredStack, itemDescription, textRenderer);
     }
@@ -105,6 +120,9 @@ public class RecipeRenderer {
                                       ItemStack hoveredStack,
                                       String itemDescription,
                                       net.minecraft.client.font.TextRenderer textRenderer) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererStonecutter()) return startY;
+
         return stonecutterRenderer.render(context, startX, startY, recipe, recipeEntry, 
                                          dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
     }
@@ -118,6 +136,9 @@ public class RecipeRenderer {
                                          ItemStack hoveredStack,
                                          String itemDescription,
                                          net.minecraft.client.font.TextRenderer textRenderer) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererCustomMachine()) return startY;
+
         return customMachineRenderer.render(context, startX, startY, recipe, recipeEntry,
                                            dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
     }

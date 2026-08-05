@@ -30,6 +30,7 @@ public class CEIClient implements ClientModInitializer {
 			// au changement de monde, ou le registre et les recettes peuvent differer.
 			com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
 			com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex.invalidate();
+			com.ceketrum.cei.gui.module.cei.util.CeiCraftTree.invalidate();
 			BrewingRecipeManager.getInstance().clearCache();
 			LootTableSourceManager.getInstance().clearCache();
 		});

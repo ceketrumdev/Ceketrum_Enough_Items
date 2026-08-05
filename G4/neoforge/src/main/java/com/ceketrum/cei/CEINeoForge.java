@@ -81,6 +81,7 @@ public class CEINeoForge {
             // au changement de monde, ou le registre et les recettes peuvent differer.
             com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
             com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex.invalidate();
+            com.ceketrum.cei.gui.module.cei.util.CeiCraftTree.invalidate();
             com.ceketrum.cei.CeiWarmup.reset();
             BrewingRecipeManager.getInstance().clearCache();
             LootTableSourceManager.getInstance().clearCache();
@@ -92,6 +93,7 @@ public class CEINeoForge {
             // au changement de monde, ou le registre et les recettes peuvent differer.
             com.ceketrum.cei.gui.module.cei.CeiModule.invalidateItemCache();
             com.ceketrum.cei.gui.module.cei.recipe.CeiRecipeIndex.invalidate();
+            com.ceketrum.cei.gui.module.cei.util.CeiCraftTree.invalidate();
             com.ceketrum.cei.CeiWarmup.reset();
             BrewingRecipeManager.getInstance().clearCache();
             LootTableSourceManager.getInstance().clearCache();

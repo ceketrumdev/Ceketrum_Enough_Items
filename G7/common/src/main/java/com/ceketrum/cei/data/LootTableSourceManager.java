@@ -47,6 +47,18 @@ public class LootTableSourceManager {
      */
     private static final Map<Class<?>, java.lang.reflect.Field[]> FIELD_CACHE = new HashMap<>();
     private boolean isCacheBuilt = false;
+    /** Profondeur maximale de la descente reflexive dans une table. */
+    private static final int LOOT_SCAN_MAX_DEPTH = 8;
+    /**
+     * Nombre maximal d'objets visites pour UNE table.
+     *
+     * Meme valeur que les deux descentes de CeiItemInfoScreen : deux mille
+     * objets decrivent tres largement une table de butin ; au-dela, on n'
+     * explore plus une table, on erre dans le graphe d'objets du jeu.
+     */
+    private static final int LOOT_SCAN_MAX_VISITED = 2000;
+    /** La premiere coupe est journalisee, les suivantes non. */
+    private static boolean LOOT_SCAN_WARNED = false;
     private int attempts = 0;
     private static final int MAX_ATTEMPTS = 5;
 
@@ -117,6 +129,9 @@ public class LootTableSourceManager {
     }
 
     public synchronized void ensureCacheBuilt() {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureLootSources()) return;
+
         if (cei$degraded) {
             return;
         }
@@ -163,8 +178,9 @@ public class LootTableSourceManager {
                 return;
             }
 
-            LOGGER.info("[LOOT] Début du scan global des loot tables...");
             long startTime = System.currentTimeMillis();
+            LOGGER.info("[LOOT] Debut du scan global des loot tables"
+                    + " -- ce scan tient en UNE image, il faut savoir ce qu'il coute.");
 
             itemToLootIds.clear();
             sourceNameCache.clear();
@@ -244,7 +260,27 @@ public class LootTableSourceManager {
      * ce qui assure une compatibilité à 100% avec les entries moddées customisées.
      */
     private void scanObjectRecursively(Object obj, Set<Item> items, Set<Object> visited, int depth) {
-        if (obj == null || depth > 8) return;
+        if (obj == null || depth > LOOT_SCAN_MAX_DEPTH) return;
+        // PLAFOND DE LARGEUR.
+        //
+        // La profondeur etait bornee, le nombre de branches ne l'etait pas :
+        // avec b branches par noeud, le cout est b puissance 8. L'ensemble
+        // anti-cycle ne rattrape rien, raisonnant par identite -- un accesseur
+        // qui construit son resultat rend un objet NEUF a chaque appel, donc
+        // add() reussit toujours.
+        //
+        // Meme defaut, meme valeur et meme remede que dans les deux descentes
+        // de CeiItemInfoScreen. Sans lui, une seule table moddee touffue fige
+        // le fil de rendu en allouant sans cesse.
+        if (visited.size() > LOOT_SCAN_MAX_VISITED) {
+            if (!LOOT_SCAN_WARNED) {
+                LOOT_SCAN_WARNED = true;
+                LOGGER.warn("[LOOT] exploration bornee a {} objets ; premiere coupe sur {}."
+                        + " Sans cette borne, cette table figeait le rendu.",
+                        LOOT_SCAN_MAX_VISITED, obj.getClass().getName());
+            }
+            return;
+        }
         if (!visited.add(obj)) return; // Protection contre les cycles infinis
 
         Class<?> clazz = obj.getClass();
@@ -482,6 +518,9 @@ public class LootTableSourceManager {
      * Trouve les sources de loot tables pour un item donné.
      */
     public List<String> getSourcesForItem(Item item) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureLootSources()) return java.util.List.of();
+
         ensureCacheBuilt();
         dropMemoIfLanguageChanged();
 
@@ -737,6 +776,9 @@ public class LootTableSourceManager {
     }
 
     public List<String> getWorldLocationsForItem(Item item) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureLootSources()) return java.util.List.of();
+
         ensureCacheBuilt();
         dropMemoIfLanguageChanged();
 

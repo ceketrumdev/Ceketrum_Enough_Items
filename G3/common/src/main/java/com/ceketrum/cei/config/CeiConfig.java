@@ -61,6 +61,55 @@ public class CeiConfig {
      * d'item. Decoche, rien de tout cela ne s'execute.
      */
     private boolean devMode = false;
+
+    /** Laisse les reglages de performance depasser leurs bornes. */
+    private boolean unlockLimits = false;
+
+    // ---- options ajoutees par scratch/cfg_options.py ----
+    //
+    // Ne pas ajouter de champ a la main ici : la table du script est
+    // la seule source de verite, elle alimente aussi l'ecran.
+
+    /** Le bouton en haut a droite de la fiche d'objet. */
+    private boolean showCalcButton = true;
+    /** Les fiches gardees a l'ecran par-dessus le jeu. */
+    private boolean showPinnedCards = true;
+    /** L'onglet qui decrit l'objet. */
+    private boolean showTabDescription = true;
+    /** L'onglet des coffres et des mobs qui donnent l'objet. */
+    private boolean showTabLoot = true;
+    /** L'onglet des biomes et structures. */
+    private boolean showTabWorld = true;
+    /** Decompose un objet en composants. Decoche, aucune recette n'est remontee. */
+    private boolean featureCraftTree = true;
+    /** Analyse les tables de butin du pack. C'est le module le plus couteux au premier chargement. */
+    private boolean featureLootSources = true;
+    /** D'ou vient un bloc dans le monde. */
+    private boolean featureBlockGeneration = true;
+    /** Les potions de l'alambic. */
+    private boolean featureBrewing = true;
+    /** Les textes descriptifs charges par langue. */
+    private boolean featureDescriptions = true;
+    /** Marquer des objets pour les retrouver. */
+    private boolean featureFavorites = true;
+    /** Les recettes de l'etabli. */
+    private boolean rendererCrafting = true;
+    /** Four, fumoir, haut fourneau. */
+    private boolean rendererSmelting = true;
+    /** La table de forge. */
+    private boolean rendererSmithing = true;
+    /** La scie de pierre. */
+    private boolean rendererStonecutter = true;
+    /** L'alambic. */
+    private boolean rendererBrewing = true;
+    /** Tout ce qui ne rentre dans aucune des cases ci-dessus. */
+    private boolean rendererCustomMachine = true;
+    /** Construit l'index des recettes par petites tranches apres l'entree en jeu, au lieu de tout payer a la premiere fiche ouverte. */
+    private boolean warmupEnabled = true;
+    /** Millisecondes par image accordees au prechauffage. */
+    private int warmupBudgetMs = 2;
+    /** Nombre de niveaux que la decomposition descend. */
+    private int craftTreeDepth = 8;
     
     private CeiConfig() {
         Path configDir = PlatformHelper.getConfigDirectory().resolve("cei");
@@ -122,6 +171,28 @@ public class CeiConfig {
             // Nouveau pipeline de recettes (cf. CeiRecipeAdapter)
             if (json.has("useNewRecipeRenderer")) useNewRecipeRenderer = json.get("useNewRecipeRenderer").getAsBoolean();
             if (json.has("devMode")) devMode = json.get("devMode").getAsBoolean();
+            if (json.has("unlockLimits")) unlockLimits = json.get("unlockLimits").getAsBoolean();
+            // options ajoutees par scratch/cfg_options.py
+            if (json.has("showCalcButton")) showCalcButton = json.get("showCalcButton").getAsBoolean();
+            if (json.has("showPinnedCards")) showPinnedCards = json.get("showPinnedCards").getAsBoolean();
+            if (json.has("showTabDescription")) showTabDescription = json.get("showTabDescription").getAsBoolean();
+            if (json.has("showTabLoot")) showTabLoot = json.get("showTabLoot").getAsBoolean();
+            if (json.has("showTabWorld")) showTabWorld = json.get("showTabWorld").getAsBoolean();
+            if (json.has("featureCraftTree")) featureCraftTree = json.get("featureCraftTree").getAsBoolean();
+            if (json.has("featureLootSources")) featureLootSources = json.get("featureLootSources").getAsBoolean();
+            if (json.has("featureBlockGeneration")) featureBlockGeneration = json.get("featureBlockGeneration").getAsBoolean();
+            if (json.has("featureBrewing")) featureBrewing = json.get("featureBrewing").getAsBoolean();
+            if (json.has("featureDescriptions")) featureDescriptions = json.get("featureDescriptions").getAsBoolean();
+            if (json.has("featureFavorites")) featureFavorites = json.get("featureFavorites").getAsBoolean();
+            if (json.has("rendererCrafting")) rendererCrafting = json.get("rendererCrafting").getAsBoolean();
+            if (json.has("rendererSmelting")) rendererSmelting = json.get("rendererSmelting").getAsBoolean();
+            if (json.has("rendererSmithing")) rendererSmithing = json.get("rendererSmithing").getAsBoolean();
+            if (json.has("rendererStonecutter")) rendererStonecutter = json.get("rendererStonecutter").getAsBoolean();
+            if (json.has("rendererBrewing")) rendererBrewing = json.get("rendererBrewing").getAsBoolean();
+            if (json.has("rendererCustomMachine")) rendererCustomMachine = json.get("rendererCustomMachine").getAsBoolean();
+            if (json.has("warmupEnabled")) warmupEnabled = json.get("warmupEnabled").getAsBoolean();
+            if (json.has("warmupBudgetMs")) warmupBudgetMs = json.get("warmupBudgetMs").getAsInt();
+            if (json.has("craftTreeDepth")) craftTreeDepth = json.get("craftTreeDepth").getAsInt();
             
             LOGGER.info("Configuration chargée depuis {}", configFile);
         } catch (Exception e) {
@@ -162,6 +233,28 @@ public class CeiConfig {
             json.addProperty("showHelpPopup", showHelpPopup);
             json.addProperty("useNewRecipeRenderer", useNewRecipeRenderer);
             json.addProperty("devMode", devMode);
+            json.addProperty("unlockLimits", unlockLimits);
+            // options ajoutees par scratch/cfg_options.py
+            json.addProperty("showCalcButton", showCalcButton);
+            json.addProperty("showPinnedCards", showPinnedCards);
+            json.addProperty("showTabDescription", showTabDescription);
+            json.addProperty("showTabLoot", showTabLoot);
+            json.addProperty("showTabWorld", showTabWorld);
+            json.addProperty("featureCraftTree", featureCraftTree);
+            json.addProperty("featureLootSources", featureLootSources);
+            json.addProperty("featureBlockGeneration", featureBlockGeneration);
+            json.addProperty("featureBrewing", featureBrewing);
+            json.addProperty("featureDescriptions", featureDescriptions);
+            json.addProperty("featureFavorites", featureFavorites);
+            json.addProperty("rendererCrafting", rendererCrafting);
+            json.addProperty("rendererSmelting", rendererSmelting);
+            json.addProperty("rendererSmithing", rendererSmithing);
+            json.addProperty("rendererStonecutter", rendererStonecutter);
+            json.addProperty("rendererBrewing", rendererBrewing);
+            json.addProperty("rendererCustomMachine", rendererCustomMachine);
+            json.addProperty("warmupEnabled", warmupEnabled);
+            json.addProperty("warmupBudgetMs", warmupBudgetMs);
+            json.addProperty("craftTreeDepth", craftTreeDepth);
             
             Files.writeString(configFile, json.toString());
             LOGGER.debug("Configuration sauvegardée dans {}", configFile);
@@ -244,6 +337,53 @@ public class CeiConfig {
     /**
      * Réinitialise la configuration aux valeurs par défaut.
      */
+
+    // ---- acces aux options ajoutees par cfg_options.py ----
+
+    public boolean isShowCalcButton() { return showCalcButton; }
+    public void setShowCalcButton(boolean v) { this.showCalcButton = v; }
+    public boolean isShowPinnedCards() { return showPinnedCards; }
+    public void setShowPinnedCards(boolean v) { this.showPinnedCards = v; }
+    public boolean isShowTabDescription() { return showTabDescription; }
+    public void setShowTabDescription(boolean v) { this.showTabDescription = v; }
+    public boolean isShowTabLoot() { return showTabLoot; }
+    public void setShowTabLoot(boolean v) { this.showTabLoot = v; }
+    public boolean isShowTabWorld() { return showTabWorld; }
+    public void setShowTabWorld(boolean v) { this.showTabWorld = v; }
+    public boolean isFeatureCraftTree() { return featureCraftTree; }
+    public void setFeatureCraftTree(boolean v) { this.featureCraftTree = v; }
+    public boolean isFeatureLootSources() { return featureLootSources; }
+    public void setFeatureLootSources(boolean v) { this.featureLootSources = v; }
+    public boolean isFeatureBlockGeneration() { return featureBlockGeneration; }
+    public void setFeatureBlockGeneration(boolean v) { this.featureBlockGeneration = v; }
+    public boolean isFeatureBrewing() { return featureBrewing; }
+    public void setFeatureBrewing(boolean v) { this.featureBrewing = v; }
+    public boolean isFeatureDescriptions() { return featureDescriptions; }
+    public void setFeatureDescriptions(boolean v) { this.featureDescriptions = v; }
+    public boolean isFeatureFavorites() { return featureFavorites; }
+    public void setFeatureFavorites(boolean v) { this.featureFavorites = v; }
+    public boolean isRendererCrafting() { return rendererCrafting; }
+    public void setRendererCrafting(boolean v) { this.rendererCrafting = v; }
+    public boolean isRendererSmelting() { return rendererSmelting; }
+    public void setRendererSmelting(boolean v) { this.rendererSmelting = v; }
+    public boolean isRendererSmithing() { return rendererSmithing; }
+    public void setRendererSmithing(boolean v) { this.rendererSmithing = v; }
+    public boolean isRendererStonecutter() { return rendererStonecutter; }
+    public void setRendererStonecutter(boolean v) { this.rendererStonecutter = v; }
+    public boolean isRendererBrewing() { return rendererBrewing; }
+    public void setRendererBrewing(boolean v) { this.rendererBrewing = v; }
+    public boolean isRendererCustomMachine() { return rendererCustomMachine; }
+    public void setRendererCustomMachine(boolean v) { this.rendererCustomMachine = v; }
+    public boolean isWarmupEnabled() { return warmupEnabled; }
+    public void setWarmupEnabled(boolean v) { this.warmupEnabled = v; }
+    public int getWarmupBudgetMs() { return warmupBudgetMs; }
+    public void setWarmupBudgetMs(int v) { this.warmupBudgetMs = Math.max(1, Math.min(50, v)); }
+    public int getCraftTreeDepth() { return craftTreeDepth; }
+    public void setCraftTreeDepth(int v) { this.craftTreeDepth = Math.max(1, Math.min(32, v)); }
+
+    public boolean isUnlockLimits() { return unlockLimits; }
+    public void setUnlockLimits(boolean v) { this.unlockLimits = v; }
+
     public void reset() {
         panelOnLeft = true;
         panelWidth = 120;
@@ -259,6 +399,28 @@ public class CeiConfig {
         showFavoritesByDefault = false;
         showHelpPopup = true;
         useNewRecipeRenderer = true;
+        unlockLimits = false;
+        // options ajoutees par scratch/cfg_options.py
+        showCalcButton = true;
+        showPinnedCards = true;
+        showTabDescription = true;
+        showTabLoot = true;
+        showTabWorld = true;
+        featureCraftTree = true;
+        featureLootSources = true;
+        featureBlockGeneration = true;
+        featureBrewing = true;
+        featureDescriptions = true;
+        featureFavorites = true;
+        rendererCrafting = true;
+        rendererSmelting = true;
+        rendererSmithing = true;
+        rendererStonecutter = true;
+        rendererBrewing = true;
+        rendererCustomMachine = true;
+        warmupEnabled = true;
+        warmupBudgetMs = 2;
+        craftTreeDepth = 8;
         save();
     }
 }

@@ -58,6 +58,50 @@ public class CeiItemInfoScreen extends Screen {
     /** Cote de la zone sensible de la poignee de redimensionnement, en pixels. */
     private static final int RESIZE_GRIP = 12;
 
+    // --- calculateur de composants ---------------------------------------
+    /**
+     * Etat du calculateur. Tant que calcOpen est faux, rien de ce mecanisme
+     * n'est evalue : le test tient en une lecture de booleen, en tete de
+     * drawTabContent.
+     */
+    private boolean calcOpen = false;
+    private int calcQty = 1;
+    /** Branches repliees, par cle de chemin. */
+    private final java.util.Set<Long> calcCollapsed = new java.util.HashSet<>();
+    /**
+     * Vrai une fois le repli initial pose.
+     *
+     * A l'ouverture, TOUTES les branches sont repliees : la profondeur est
+     * maximale, et c'est le repli -- non un reglage de profondeur -- qui tient
+     * l'affichage court. Le semis n'a lieu qu'une fois par ouverture, sans
+     * quoi changer la quantite rabattrait ce que le joueur vient d'ouvrir.
+     */
+    private boolean calcSeeded = false;
+    /**
+     * Premiere ligne visible.
+     *
+     * Le deplacement se fait aux fleches et a la molette. PAS de barre de
+     * defilement : c'est une preference etablie du proprietaire du mod, notee
+     * ici pour qu'elle ne soit pas reintroduite par megarde.
+     */
+    private int calcScroll = 0;
+    /**
+     * Zones sensibles, memorisees AU DESSIN.
+     *
+     * Le clic les relit telles quelles : une position calculee deux fois finit
+     * toujours par diverger, la lecon du bouton "+" a suffi.
+     */
+    private int calcMinusX = -1, calcMinusY = -1;
+    private int calcPlusX = -1, calcPlusY = -1;
+    private int calcAreaX = -1, calcAreaY = -1, calcAreaW = 0, calcAreaH = 0;
+    private int calcUpX = -1, calcUpY = -1, calcDownX = -1, calcDownY = -1;
+    private boolean calcHasArrows = false;
+    /** Bande des lignes : la molette y defile, ailleurs elle regle la quantite. */
+    private int calcRowsY = -1, calcRowsH = 0;
+    /** Chevrons de repli : {x, y, largeur, hauteur, cle}, memorises AU DESSIN. */
+    private final java.util.List<long[]> calcChevrons = new java.util.ArrayList<>();
+
+
     /**
      * Hauteur minimale laissee a la recette. En dessous, le texte de l'item ne
      * prend aucune place : c'est la recette qui prime.
@@ -316,13 +360,15 @@ public class CeiItemInfoScreen extends Screen {
 
     private void updateMainTabs() {
         visibleMainTabs.clear();
-        visibleMainTabs.add(TabType.DESCRIPTION);
+        if (com.ceketrum.cei.config.CeiConfig.getInstance().isShowTabDescription()) {
+            visibleMainTabs.add(TabType.DESCRIPTION);
+        }
         visibleMainTabs.add(TabType.CRAFTING);
         visibleMainTabs.add(TabType.USAGES);
 
         // Loot eligibility
         List<String> lootSources = LootTableSourceManager.getInstance().getSourcesForItem(targetStack.getItem());
-        if (!lootSources.isEmpty()) {
+        if (!lootSources.isEmpty() && com.ceketrum.cei.config.CeiConfig.getInstance().isShowTabLoot()) {
             visibleMainTabs.add(TabType.LOOT);
         }
 
@@ -338,7 +384,7 @@ public class CeiItemInfoScreen extends Screen {
                 && !(locations.size() == 1 && locations.contains(worldPlaceholder));
         boolean hasBlockGen = !blockGen.isEmpty();
 
-        if (hasWorldLocs || hasBlockGen) {
+        if ((hasWorldLocs || hasBlockGen) && com.ceketrum.cei.config.CeiConfig.getInstance().isShowTabWorld()) {
             visibleMainTabs.add(TabType.WORLD);
         }
     }
@@ -559,6 +605,33 @@ public class CeiItemInfoScreen extends Screen {
                 context.fill(opX + 2 + d * 2, opY + 3, opX + 3 + d * 2, opY + 9, 0xFFFFFFFF);
             }
         }
+
+        // Arbre de fabrication. Toujours visible, a une position fixe et a
+        // l'ecart des trois boutons conditionnels : places a sa gauche, ils le
+        // faisaient sauter d'un endroit a l'autre selon que la fiche etait
+        // epinglee ou non.
+        // Bouton masque : ce bloc est le dernier de la methode.
+        if (!calcAvailable()) return;
+
+        int calcX = calcButtonX();
+        int calcY = calcButtonY();
+        boolean hoverCalc = mouseX >= calcX && mouseX < calcX + 12
+                && mouseY >= calcY && mouseY < calcY + 12;
+        context.fill(calcX, calcY, calcX + 12, calcY + 12,
+                calcOpen ? 0x66FFD700 : (hoverCalc ? 0x66FFFFFF : 0x22FFFFFF));
+        context.outline(calcX, calcY, 12, 12, calcOpen ? 0xFFFFD700 : 0x44FFFFFF);
+        // Deux machines reliees par un cable coude. Le pave de calculatrice
+        // d'avant disait "on compte" ; celui-ci dit "on suit une chaine", ce
+        // qui est le propos de la fonction.
+        int glyph = calcOpen ? 0xFFFFD700 : 0xFFFFFFFF;
+        int wire = calcOpen ? 0xFFDDAA00 : 0xFFAAAAAA;
+        context.fill(calcX + 2, calcY + 2, calcX + 5, calcY + 5, glyph);
+        context.fill(calcX + 7, calcY + 7, calcX + 10, calcY + 10, glyph);
+        context.fill(calcX + 5, calcY + 3, calcX + 9, calcY + 4, wire);
+        // Jusqu'a calcY + 7 seulement : la seconde machine commence a cette
+        // ligne, et le cable etant trace apres elle, un pixel de plus lui
+        // percait le boitier.
+        context.fill(calcX + 8, calcY + 3, calcX + 9, calcY + 7, wire);
     }
 
     private int applyOpacity(int color, float opacity) {
@@ -566,6 +639,40 @@ public class CeiItemInfoScreen extends Screen {
         int a = (int) (((color >>> 24) & 0xFF) * opacity);
         return (a << 24) | (color & 0x00FFFFFF);
     }
+
+    /**
+     * Position du bouton du calculateur.
+     *
+     * Une seule source : le dessin, le clic et l'infobulle passent tous par
+     * ces deux methodes.
+     */
+    /** Le calculateur est-il disponible ? Module et bouton sont deux options. */
+    private boolean calcAvailable() {
+        var cfg = com.ceketrum.cei.config.CeiConfig.getInstance();
+        return cfg.isFeatureCraftTree() && cfg.isShowCalcButton();
+    }
+
+    private int calcButtonX() {
+        // En haut a DROITE, a l'ecart des trois boutons d'epinglage.
+        //
+        // La place est libre et c'est verifiable : le titre est centre et
+        // tronque a containerWidth - 60, il ne peut donc jamais depasser
+        // containerWidth - 30. Douze pixels dans une marge de trente.
+        return containerX + containerWidth - 18;
+    }
+
+    private int calcButtonY() {
+        return containerY + 5;
+    }
+
+    private boolean isOverCalcButton(double mouseX, double mouseY) {
+        if (!calcAvailable()) return false;
+
+        int x = calcButtonX();
+        int y = calcButtonY();
+        return mouseX >= x && mouseX < x + 12 && mouseY >= y && mouseY < y + 12;
+    }
+
 
     private void drawMainTabsBackground(GuiGraphicsExtractor context, int mouseX, int mouseY, float opacity) {
         for (int i = 0; i < visibleMainTabs.size(); i++) {
@@ -903,6 +1010,13 @@ public class CeiItemInfoScreen extends Screen {
         int contentY = containerY + 28;
         int contentWidth = containerWidth - 30;
         int contentHeight = containerHeight - 45;
+
+        // Un booleen suffit a tout court-circuiter : calculateur ferme, aucune
+        // recette n'est parcourue, aucun stock n'est lu.
+        if (calcOpen && calcAvailable()) {
+            drawCalculator(context, mouseX, mouseY, contentX, contentY, contentWidth, contentHeight);
+            return;
+        }
 
 
         switch (activeMainTab) {
@@ -1778,6 +1892,290 @@ public class CeiItemInfoScreen extends Screen {
     }
 
     /**
+     * Dessine la decomposition.
+     *
+     * Toutes les zones sensibles sont enregistrees ici, au moment ou elles sont
+     * tracees. Le clic et la molette les relisent : il n'existe donc pas de
+     * seconde geometrie a garder en phase.
+     */
+    private void drawCalculator(GuiGraphicsExtractor context, int mouseX, int mouseY,
+                                int x, int y, int w, int h) {
+        calcAreaX = x;
+        calcAreaY = y;
+        calcAreaW = w;
+        calcAreaH = h;
+        calcChevrons.clear();
+
+        // Une seule ligne d'en-tete depuis que les bascules ont disparu.
+        //
+        // Les hauteurs ne sont pas approximatives, elles se comptent :
+        //
+        //   y-4 .. y+11   icone de l'objet vise (seize pixels)
+        //   y+12, y+13    marge
+        //   y+14          filet
+        //   y+15          marge
+        //   y+16 ..       premiere icone de l'arbre, dessinee a listTop - 4
+        //
+        // A y+17, l'icone de l'en-tete descendait jusqu'a y+12 et mordait le
+        // filet, trace a cette meme ligne.
+        int rowY = y;
+        int listTop = y + 20;
+        int bottom = y + h;
+        int visible = Math.max(1, (bottom - listTop) / 18);
+        calcRowsY = listTop;
+        calcRowsH = Math.max(0, bottom - listTop);
+
+        // Le resultat est demande AVANT de dessiner l'en-tete : c'est le
+        // nombre de lignes qui decide si les fleches y prennent leur place.
+        var result = com.ceketrum.cei.gui.module.cei.util.CeiCraftTree
+                .get(targetStack, calcQty, com.ceketrum.cei.config.CeiConfig.getInstance().getCraftTreeDepth());
+
+        // -4 et non -3 : l'icone se centre ainsi exactement sur le texte --
+        // seize pixels contre huit, les deux centres tombent sur y+3 -- et
+        // cesse de mordre le filet.
+        drawStack(context, targetStack, x, rowY - 4);
+
+        int boxW = 46;
+        int boxX = x + w - boxW;
+        calcMinusX = boxX;
+        calcMinusY = rowY - 2;
+        calcPlusX = boxX + boxW - 11;
+        calcPlusY = rowY - 2;
+
+        drawMiniButton(context, calcMinusX, calcMinusY, "-", mouseX, mouseY);
+        drawMiniButton(context, calcPlusX, calcPlusY, "+", mouseX, mouseY);
+        String qty = String.valueOf(calcQty);
+        int qtyW = this.font.width(qty);
+        context.text(this.font, qty,
+                boxX + (boxW - qtyW) / 2, rowY, 0xFFFFFFFF, false);
+
+        context.fill(x, rowY + 14, x + w, rowY + 15, 0x22FFFFFF);
+
+        if (result.noRecipe) {
+            calcHasArrows = false;
+            calcRowsH = 0;
+            drawCalcTitle(context, x, rowY, boxX - 6);
+            context.text(this.font, CeiText.t("cei.info.no_recipes"),
+                    x, listTop, 0xFFFF6666, false);
+            return;
+        }
+
+        // Tout replie a l'ouverture, une seule fois : changer la quantite ne
+        // doit pas rabattre ce que le joueur vient d'ouvrir.
+        if (!calcSeeded) {
+            seedCollapsed(result.roots);
+            calcSeeded = true;
+        }
+
+        // La mise a plat ne parcourt que des noeuds deja construits : aucune
+        // recette n'est relue ici, malgre l'appel par image.
+        java.util.List<com.ceketrum.cei.gui.module.cei.util.CeiCraftTree.Row> rows =
+                com.ceketrum.cei.gui.module.cei.util.CeiCraftTree.flatten(result.roots, calcCollapsed);
+        int total = rows.size();
+
+        // Le bornage se fait ICI parce que le dessin est le seul endroit qui
+        // connaisse la hauteur disponible -- laquelle change quand on
+        // redimensionne la fiche, et quand on replie une branche.
+        int maxScroll = Math.max(0, total - visible);
+        if (calcScroll > maxScroll) calcScroll = maxScroll;
+        if (calcScroll < 0) calcScroll = 0;
+
+        int titleRight = boxX - 6;
+        calcHasArrows = total > visible;
+        if (calcHasArrows) {
+            calcUpX = boxX - 27;
+            calcUpY = rowY - 2;
+            calcDownX = calcUpX + 12;
+            calcDownY = rowY - 2;
+            drawArrowButton(context, calcUpX, calcUpY, true, mouseX, mouseY);
+            drawArrowButton(context, calcDownX, calcDownY, false, mouseX, mouseY);
+            titleRight = calcUpX - 6;
+
+            String pos = (calcScroll + 1) + "-" + Math.min(total, calcScroll + visible)
+                    + "/" + total;
+            int pw = this.font.width(pos);
+            int px = calcUpX - 4 - pw;
+            // Le compteur cede la place au titre plutot que de l'ecraser.
+            if (px > x + 60) {
+                context.text(this.font, pos, px, rowY, 0xFF888888, false);
+                titleRight = px - 6;
+            }
+        }
+        drawCalcTitle(context, x, rowY, titleRight);
+
+        drawTreeRows(context, rows, x, listTop, w, bottom, visible, mouseX, mouseY);
+
+        if (result.truncated) {
+            context.text(this.font, "...", x, bottom - 8, 0xFF888888, false);
+        }
+    }
+
+    /** Le nom de l'objet vise, tronque a la place que lui laisse l'en-tete. */
+    private void drawCalcTitle(GuiGraphicsExtractor context, int x, int rowY, int right) {
+        String title = TextRenderHelper.truncateText(
+                targetStack.getHoverName().getString(),
+                Math.max(12, right - (x + 20)), this.font);
+        context.text(this.font, title, x + 20, rowY, 0xFFFFD700, false);
+    }
+
+    /**
+     * Replie toutes les branches ayant des enfants.
+     *
+     * Recursion bornee par les memes garde-fous que la descente : au plus
+     * MAX_NODES noeuds, MAX_DEPTH niveaux.
+     */
+    private void seedCollapsed(java.util.List<com.ceketrum.cei.gui.module.cei.util.CeiCraftTree.Node> nodes) {
+        for (var n : nodes) {
+            if (n.children.isEmpty()) continue;
+            calcCollapsed.add(n.key);
+            seedCollapsed(n.children);
+        }
+    }
+
+    /**
+     * Les lignes de l'arbre.
+     *
+     * Les traits de liaison se lisent dans row.trail : un bit par profondeur
+     * ou un ancetre a encore des freres en dessous. C'est ce qui evite de
+     * remonter la hierarchie a chaque ligne pour savoir s'il faut prolonger un
+     * trait.
+     */
+    private void drawTreeRows(GuiGraphicsExtractor context,
+                              java.util.List<com.ceketrum.cei.gui.module.cei.util.CeiCraftTree.Row> rows,
+                              int x, int rowY, int w, int bottom, int visible,
+                              int mouseX, int mouseY) {
+        int end = Math.min(rows.size(), calcScroll + visible);
+        for (int i = calcScroll; i < end; i++) {
+            if (rowY + 18 > bottom) break;
+            var row = rows.get(i);
+            var node = row.node;
+            int indent = row.depth * 10;
+
+            for (int d = 0; d < row.depth; d++) {
+                if ((row.trail & (1L << d)) != 0) {
+                    context.fill(x + d * 10 + 3, rowY - 5, x + d * 10 + 4, rowY + 13, 0x33FFFFFF);
+                }
+            }
+            if (row.depth > 0) {
+                int gx = x + (row.depth - 1) * 10 + 3;
+                context.fill(gx, rowY - 5, gx + 1, rowY + 4, 0x55FFFFFF);
+                context.fill(gx, rowY + 3, gx + 7, rowY + 4, 0x55FFFFFF);
+            }
+
+            if (!node.children.isEmpty()) {
+                int cx = x + indent;
+                boolean open = !calcCollapsed.contains(node.key);
+                boolean hover = mouseX >= cx - 1 && mouseX < cx + 9
+                        && mouseY >= rowY - 4 && mouseY < rowY + 10;
+                drawChevron(context, cx, rowY + 1, open, hover);
+                // Cible de clic elargie a la hauteur de la ligne : un triangle
+                // de 7 px se rate a la souris.
+                calcChevrons.add(new long[]{ cx - 1, rowY - 4, 10, 14, node.key });
+            }
+
+            int ix = x + indent + 9;
+            drawStack(context, node.stack, ix, rowY - 4);
+            activeSlots.add(new RenderedSlot(node.stack, ix, rowY - 4, 16));
+
+            String amount = com.ceketrum.cei.gui.module.cei.util.CeiCraftTree.fmt(node.count);
+            int amountW = this.font.width(amount);
+            int amountRight = x + w - 14;
+            int nameX = ix + 20;
+            String name = TextRenderHelper.truncateText(
+                    node.stack.getHoverName().getString(),
+                    Math.max(12, amountRight - amountW - 4 - nameX), this.font);
+            // L'outil se distingue a l'oeil, nom et quantite en bleu clair :
+            // une ligne qui affiche 1 quand ses voisines affichent 4 doit dire
+            // pourquoi.
+            int nameColor = node.tool ? 0xFF88CCFF
+                    : (node.raw ? 0xFFDDDDDD : 0xFFAAAAAA);
+            context.text(this.font, name, nameX, rowY, nameColor, false);
+            context.text(this.font, amount, amountRight - amountW, rowY,
+                    node.tool ? 0xFF88CCFF : 0xFFFFFFFF, false);
+
+            int px = x + w - 9;
+            context.fill(px, rowY + 1, px + 6, rowY + 7,
+                    node.enough() ? 0xFF44CC44 : 0xFFCC4444);
+
+            rowY += 18;
+        }
+    }
+
+    /** Petit bouton carre de 11 px, pour le reglage de la quantite. */
+    private void drawMiniButton(GuiGraphicsExtractor context, int x, int y, String label,
+                                int mouseX, int mouseY) {
+        boolean hover = mouseX >= x && mouseX < x + 11 && mouseY >= y && mouseY < y + 11;
+        context.fill(x, y, x + 11, y + 11, hover ? 0x66FFFFFF : 0x22FFFFFF);
+        context.outline(x, y, 11, 11, 0x44FFFFFF);
+        int lw = this.font.width(label);
+        context.text(this.font, label, x + (11 - lw) / 2, y + 2, 0xFFFFFFFF, false);
+    }
+
+    /**
+     * Fleche de pagination.
+     *
+     * Dessinee en rectangles plutot qu'en caractere : la police par defaut ne
+     * garantit pas les triangles Unicode, et une fleche manquante passerait
+     * pour un bouton mort.
+     */
+    private void drawArrowButton(GuiGraphicsExtractor context, int x, int y, boolean up,
+                                 int mouseX, int mouseY) {
+        boolean hover = mouseX >= x && mouseX < x + 11 && mouseY >= y && mouseY < y + 11;
+        context.fill(x, y, x + 11, y + 11, hover ? 0x66FFFFFF : 0x22FFFFFF);
+        context.outline(x, y, 11, 11, 0x44FFFFFF);
+        for (int i = 0; i < 4; i++) {
+            int ly = up ? y + 3 + i : y + 7 - i;
+            context.fill(x + 5 - i, ly, x + 6 + i, ly + 1, 0xFFFFFFFF);
+        }
+    }
+
+    /** Chevron de repli : plein vers le bas si la branche est ouverte. */
+    private void drawChevron(GuiGraphicsExtractor context, int x, int y, boolean open, boolean hover) {
+        int c = hover ? 0xFFFFFFFF : 0xFFAAAAAA;
+        if (open) {
+            context.fill(x, y, x + 7, y + 1, c);
+            context.fill(x + 1, y + 1, x + 6, y + 2, c);
+            context.fill(x + 2, y + 2, x + 5, y + 3, c);
+            context.fill(x + 3, y + 3, x + 4, y + 4, c);
+        } else {
+            context.fill(x + 1, y - 1, x + 2, y + 6, c);
+            context.fill(x + 2, y, x + 3, y + 5, c);
+            context.fill(x + 3, y + 1, x + 4, y + 4, c);
+            context.fill(x + 4, y + 2, x + 5, y + 3, c);
+        }
+    }
+
+    /** Borne la quantite et rien d'autre : le recalcul se fait a la lecture. */
+    private void setCalcQty(int q) {
+        calcQty = Math.max(com.ceketrum.cei.gui.module.cei.util.CeiCraftTree.MIN_QTY,
+                Math.min(com.ceketrum.cei.gui.module.cei.util.CeiCraftTree.MAX_QTY, q));
+    }
+
+    /**
+     * Molette dans le calculateur.
+     *
+     * Sur la bande des lignes elle fait defiler ; ailleurs -- donc sur
+     * l'en-tete, la ou se trouvent justement [-] et [+] -- elle regle la
+     * quantite. Toujours aucune barre de defilement : le deplacement reste aux
+     * fleches et a la molette.
+     */
+    private boolean calculatorWheel(double mouseX, double mouseY, double amount) {
+        if (!calcOpen || calcAreaW <= 0) return false;
+        if (mouseX < calcAreaX || mouseX >= calcAreaX + calcAreaW) return false;
+        if (mouseY < calcAreaY || mouseY >= calcAreaY + calcAreaH) return false;
+
+        if (calcHasArrows && mouseY >= calcRowsY && mouseY < calcRowsY + calcRowsH) {
+            calcScroll = Math.max(0, calcScroll - (int) Math.signum(amount));
+            return true;
+        }
+
+        int step = com.ceketrum.cei.gui.util.CeiScreenHelper.hasShiftDown() ? 16 : 1;
+        setCalcQty(calcQty + (int) Math.signum(amount) * step);
+        return true;
+    }
+
+
+    /**
      * Hauteur reservee au texte de l'item, sous la recette.
      *
      * Elle ne prend que ce qui reste une fois la recette servie, et jamais
@@ -1934,6 +2332,59 @@ public class CeiItemInfoScreen extends Screen {
 
         // Poignee de redimensionnement. Testee avant la barre de titre et
         // avant le contenu : sinon un clic dans le coin tomberait sur un slot.
+        // Bouton du calculateur, teste avec les autres boutons d'en-tete.
+        if (isOverCalcButton(mouseX, mouseY)) {
+            calcOpen = !calcOpen;
+            if (calcOpen) {
+                setCalcQty(calcQty);
+                // Chaque ouverture repart d'un arbre entierement replie.
+                calcCollapsed.clear();
+                calcSeeded = false;
+                calcScroll = 0;
+            }
+            Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+            return true;
+        }
+
+        // Commandes du calculateur. Testees avant le contenu de l'onglet :
+        // quand il est ouvert, c'est lui qui occupe la zone.
+        if (calcOpen) {
+            if (mouseX >= calcMinusX && mouseX < calcMinusX + 11
+                    && mouseY >= calcMinusY && mouseY < calcMinusY + 11) {
+                setCalcQty(calcQty - (com.ceketrum.cei.gui.util.CeiScreenHelper.hasShiftDown() ? 16 : 1));
+                return true;
+            }
+            if (mouseX >= calcPlusX && mouseX < calcPlusX + 11
+                    && mouseY >= calcPlusY && mouseY < calcPlusY + 11) {
+                setCalcQty(calcQty + (com.ceketrum.cei.gui.util.CeiScreenHelper.hasShiftDown() ? 16 : 1));
+                return true;
+            }
+            if (calcHasArrows) {
+                if (mouseX >= calcUpX && mouseX < calcUpX + 11
+                        && mouseY >= calcUpY && mouseY < calcUpY + 11) {
+                    calcScroll = Math.max(0, calcScroll - 1);
+                    return true;
+                }
+                if (mouseX >= calcDownX && mouseX < calcDownX + 11
+                        && mouseY >= calcDownY && mouseY < calcDownY + 11) {
+                    // Le plafond est applique au dessin, seul endroit qui
+                    // connaisse la hauteur disponible.
+                    calcScroll++;
+                    return true;
+                }
+            }
+            // Chevrons, relus exactement tels qu'ils ont ete dessines.
+            for (long[] hit : calcChevrons) {
+                if (mouseX >= hit[0] && mouseX < hit[0] + hit[2]
+                        && mouseY >= hit[1] && mouseY < hit[1] + hit[3]) {
+                    if (!calcCollapsed.remove(hit[4])) calcCollapsed.add(hit[4]);
+                    Minecraft.getInstance().getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+                    return true;
+                }
+            }
+        }
+
+
         if (isPinned && isOverResizeGrip(mouseX, mouseY)) {
             manager.bringToFront(card);
             card.beginResize(containerX, containerY);
@@ -2185,6 +2636,7 @@ public class CeiItemInfoScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (calculatorWheel(mouseX, mouseY, verticalAmount)) return true;
         if (categoryWheel(mouseX, mouseY, verticalAmount)) return true;
         if (descriptionWheel(mouseX, mouseY, verticalAmount)) return true;
         if (this.ceiModule != null) {
@@ -2284,7 +2736,29 @@ public class CeiItemInfoScreen extends Screen {
     }
 
     private static void unpackOutputObject(Object obj, List<ItemStack> list, Set<Object> visited, int depth) {
-        if (obj == null || depth > 8 || !visited.add(obj)) return;
+        if (obj == null || depth > CEI_UNPACK_MAX_DEPTH) return;
+        // PLAFOND DE LARGEUR -- c'est lui qui manquait.
+        //
+        // La profondeur etait bornee, le nombre de branches ne l'etait pas.
+        // Cette methode invoque toute methode sans argument de l'objet : avec
+        // b branches par noeud, le cout est b puissance 8. L'ensemble
+        // anti-cycle n'y peut rien, stream() et copy() rendant un objet NEUF a
+        // chaque appel -- visited.add() reussit donc toujours.
+        //
+        // Sans ce plafond, une seule recette moddee au graphe touffu fige le
+        // fil de rendu pendant des minutes en allouant sans cesse, jusqu'a la
+        // mort du processus par manque de memoire, et sans un mot au journal.
+        if (visited.size() > CEI_UNPACK_MAX_VISITED) {
+            if (!CEI_UNPACK_WARNED) {
+                CEI_UNPACK_WARNED = true;
+                org.slf4j.LoggerFactory.getLogger("cei-unpack").warn(
+                        "[cei] exploration bornee a {} objets ; premiere coupe sur {}."
+                        + " Sans cette borne, cette recette figeait le rendu.",
+                        CEI_UNPACK_MAX_VISITED, obj.getClass().getName());
+            }
+            return;
+        }
+        if (!visited.add(obj)) return;
 
         if (obj instanceof ItemStack stack) {
             if (!stack.isEmpty()) {
@@ -2457,6 +2931,8 @@ public class CeiItemInfoScreen extends Screen {
     private static final int CEI_UNPACK_MAX_DEPTH = 8;
     /** Nombre maximal d'objets visites, filet de securite global. */
     private static final int CEI_UNPACK_MAX_VISITED = 2000;
+    /** La premiere coupe est journalisee, les suivantes non. */
+    private static boolean CEI_UNPACK_WARNED = false;
 
     private static void unpackInputObject(Object obj, List<ItemStack> list, Set<Object> visited, int depth) {
         // Le set `visited` ne suffit PAS a garantir la terminaison : les methodes
@@ -2465,7 +2941,16 @@ public class CeiItemInfoScreen extends Screen {
         // bornes, l'exploration part en StackOverflowError (constate sur 26.3).
         if (obj == null) return;
         if (depth > CEI_UNPACK_MAX_DEPTH) return;
-        if (visited.size() > CEI_UNPACK_MAX_VISITED) return;
+        if (visited.size() > CEI_UNPACK_MAX_VISITED) {
+            if (!CEI_UNPACK_WARNED) {
+                CEI_UNPACK_WARNED = true;
+                org.slf4j.LoggerFactory.getLogger("cei-unpack").warn(
+                        "[cei] exploration bornee a {} objets ; premiere coupe sur {}."
+                        + " Sans cette borne, cette recette figeait le rendu.",
+                        CEI_UNPACK_MAX_VISITED, obj.getClass().getName());
+            }
+            return;
+        }
         if (!visited.add(obj)) return;
 
         if (obj instanceof net.minecraft.world.item.crafting.Ingredient ing) {
@@ -2520,9 +3005,21 @@ public class CeiItemInfoScreen extends Screen {
         // Avoid reflecting on typical standard library / minecraft / game classes that aren't custom recipe objects
         String className = obj.getClass().getName();
         if (className.startsWith("java.") || className.startsWith("javax.") || className.startsWith("sun.") || className.startsWith("com.sun.") ||
-            className.startsWith("net.minecraft.registry.") || className.startsWith("net.minecraft.class_") ||
-            className.equals("net.minecraft.recipe.RecipeEntry") || className.startsWith("com.google.gson.") ||
-            className.startsWith("com.mojang.datafixers.") || className.startsWith("com.mojang.serialization.")) {
+            // La RACINE du paquet, et rien de plus fin.
+            //
+            // "net.minecraft.registry." est un nom Yarn et "net.minecraft.class_"
+            // un prefixe intermediaire : ni l'un ni l'autre n'existe a
+            // l'execution sur NeoForge, ou les classes portent les noms
+            // officiels Mojang (seules les methodes sont en SRG). Ces gardes
+            // ne se declenchaient donc jamais la, et la reflexion descendait
+            // dans Minecraft lui-meme -- d'ou le debordement de pile constate
+            // sur G1 NeoForge, et sur lui seul.
+            //
+            // "net.minecraft." vaut sous Yarn, intermediaire, SRG et Mojang.
+            // C'est exactement ce qu'ecrit deja la jumelle unpackOutputObject.
+            className.startsWith("net.minecraft.") || className.startsWith("com.mojang.") ||
+            className.startsWith("com.google.") || className.startsWith("io.netty.") ||
+            className.startsWith("org.lwjgl.")) {
             return;
         }
 

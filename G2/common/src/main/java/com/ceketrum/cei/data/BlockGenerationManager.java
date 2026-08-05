@@ -49,6 +49,9 @@ public class BlockGenerationManager {
      * Explore récursivement tous les biomes et leurs PlacedFeatures.
      */
     public synchronized void ensureCacheBuilt() {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureBlockGeneration()) return;
+
         if (isCacheBuilt) return;
         
         MinecraftClient client = MinecraftClient.getInstance();
@@ -235,6 +238,9 @@ public class BlockGenerationManager {
      * Renvoie la liste de génération naturelle (biomes, structures, altitudes) pour un bloc donné.
      */
     public List<String> getBlockGenerationSources(Item item) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureBlockGeneration()) return java.util.List.of();
+
         ensureCacheBuilt();
         
         

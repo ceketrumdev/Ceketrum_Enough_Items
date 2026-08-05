@@ -43,6 +43,9 @@ public class ItemDescriptionManager {
      * @param languageCode Code de langue (ex: "fr_fr", "en_us")
      */
     public void loadDescriptions(String languageCode) {
+        // Module coupe : aucun fichier de langue n'est lu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureDescriptions()) return;
+
         if (currentLanguage.equals(languageCode) && !descriptions.isEmpty()) {
             // Déjà chargé pour cette langue
             return;
@@ -161,6 +164,9 @@ public class ItemDescriptionManager {
      * @return La description de l'item, ou une chaîne vide si non trouvée
      */
     public String getDescription(Item item) {
+        // Module coupe.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureDescriptions()) return "";
+
         // S'assurer que les descriptions sont chargées
         if (descriptions.isEmpty()) {
             LOGGER.warn("Aucune description chargée, tentative de rechargement...");

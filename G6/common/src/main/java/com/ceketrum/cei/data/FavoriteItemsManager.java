@@ -53,6 +53,9 @@ public class FavoriteItemsManager {
      * @param itemId L'identifiant de l'item
      */
     public void addFavorite(Identifier itemId) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureFavorites()) return;
+
         favorites.add(itemId);
         save();
     }
@@ -72,6 +75,9 @@ public class FavoriteItemsManager {
      * @return true si l'item est favori, false sinon
      */
     public boolean isFavorite(Identifier itemId) {
+        // Module coupe dans la configuration : le travail n'a pas lieu.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isFeatureFavorites()) return false;
+
         return favorites.contains(itemId);
     }
     

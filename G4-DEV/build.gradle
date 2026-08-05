@@ -18,5 +18,5 @@ allprojects {
     apply plugin: 'eclipse'
 
     group = 'com.ceketrum'
-    version = '0.1.4-DEV'
+    version = '0.1.5-DEV'
 }

@@ -64,6 +64,10 @@ public final class CeiWarmup {
      */
     public static void onClientFrame() {
         if (done) return;
+        // Prechauffage coupe : on marque le travail comme fait, le chemin
+        // paresseux reste disponible a l'ouverture d'une fiche.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isWarmupEnabled()) { done = true; return; }
+
 
         Minecraft client = Minecraft.getInstance();
         if (client == null || client.level == null || client.player == null) return;
@@ -74,7 +78,8 @@ public final class CeiWarmup {
             if (startedAt == 0L) startedAt = System.currentTimeMillis();
             buildFrames++;
             try {
-                recipesReady = CeiRecipeIndex.buildStep(client, BUDGET_NANOS);
+                recipesReady = CeiRecipeIndex.buildStep(client,
+                        com.ceketrum.cei.config.CeiConfig.getInstance().getWarmupBudgetMs() * 1_000_000L);
             } catch (Exception | StackOverflowError | LinkageError e) {
                 // Un echec de prechauffage ne doit jamais empecher de jouer :
                 // le chemin paresseux reste disponible a l'ouverture d'une fiche.

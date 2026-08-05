@@ -53,6 +53,9 @@ public class RecipeRenderer {
                                     ItemStack hoveredStack,
                                     String itemDescription,
                                     net.minecraft.client.gui.Font textRenderer) {
+        // Rendu coupe : on rend la position d'entree, donc rien ne bouge.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererCrafting()) return startY;
+
         int newPathY = tryRenderNew(context, startX, startY, recipe, dynamicRegistryManager, textRenderer);
         if (newPathY >= 0) return newPathY;
 
@@ -79,6 +82,9 @@ public class RecipeRenderer {
                                   ItemStack hoveredStack,
                                   String itemDescription,
                                   net.minecraft.client.gui.Font textRenderer) {
+        // Rendu coupe : on rend la position d'entree, donc rien ne bouge.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererSmelting()) return startY;
+
         int newPathY = tryRenderNew(context, startX, startY, recipe, dynamicRegistryManager, textRenderer);
         if (newPathY >= 0) return newPathY;
 
@@ -95,6 +101,9 @@ public class RecipeRenderer {
                                    ItemStack hoveredStack,
                                    String itemDescription,
                                    net.minecraft.client.gui.Font textRenderer) {
+        // Rendu coupe : on rend la position d'entree, donc rien ne bouge.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererSmithing()) return startY;
+
         int newPathY = tryRenderNew(context, startX, startY, recipe, dynamicRegistryManager, textRenderer);
         if (newPathY >= 0) return newPathY;
 
@@ -111,6 +120,9 @@ public class RecipeRenderer {
                                   ItemStack hoveredStack,
                                   String itemDescription,
                                   net.minecraft.client.gui.Font textRenderer) {
+        // Rendu coupe : on rend la position d'entree, donc rien ne bouge.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererBrewing()) return startY;
+
         return brewingRenderer.render(context, startX, startY, recipe, recipeEntry, 
                                      dynamicRegistryManager, hoveredStack, itemDescription, textRenderer);
     }
@@ -122,6 +134,9 @@ public class RecipeRenderer {
                                            ItemStack inputPotion, ItemStack ingredient, ItemStack outputPotion,
                                            ItemStack hoveredStack, String itemDescription,
                                            net.minecraft.client.gui.Font textRenderer) {
+        // Rendu coupe : on rend la position d'entree, donc rien ne bouge.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererBrewing()) return startY;
+
         return brewingRenderer.renderFromData(context, startX, startY, inputPotion, ingredient, outputPotion,
                                              hoveredStack, itemDescription, textRenderer);
     }
@@ -135,6 +150,9 @@ public class RecipeRenderer {
                                       ItemStack hoveredStack,
                                       String itemDescription,
                                       net.minecraft.client.gui.Font textRenderer) {
+        // Rendu coupe : on rend la position d'entree, donc rien ne bouge.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererStonecutter()) return startY;
+
         int newPathY = tryRenderNew(context, startX, startY, recipe, dynamicRegistryManager, textRenderer);
         if (newPathY >= 0) return newPathY;
 
@@ -151,6 +169,9 @@ public class RecipeRenderer {
                                          ItemStack hoveredStack,
                                          String itemDescription,
                                          net.minecraft.client.gui.Font textRenderer) {
+        // Rendu coupe : on rend la position d'entree, donc rien ne bouge.
+        if (!com.ceketrum.cei.config.CeiConfig.getInstance().isRendererCustomMachine()) return startY;
+
         int newPathY = tryRenderNew(context, startX, startY, recipe, dynamicRegistryManager, textRenderer);
         if (newPathY >= 0) return newPathY;
 

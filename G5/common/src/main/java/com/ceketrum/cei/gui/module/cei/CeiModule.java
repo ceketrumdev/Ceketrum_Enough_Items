@@ -46,6 +46,26 @@ public class CeiModule {
     private List<ItemStack> filteredItemsCache = null;
     private String lastFilterState = "";
     private String lastSearchText = "";
+
+    /**
+     * Journal des transitions d'ecran.
+     *
+     * Le plantage vise est SILENCIEUX : ni exception, ni sequence d'arret. Il
+     * n'y aura donc jamais de message d'erreur -- seulement la derniere ligne
+     * ecrite avant la mort, qui nommera l'endroit.
+     */
+    private static final org.slf4j.Logger CEI_NAV =
+            org.slf4j.LoggerFactory.getLogger("cei-nav");
+
+    /**
+     * Ecran demande par un clic, installe a la PROCHAINE image.
+     *
+     * Changer d'ecran au milieu du traitement d'un clic revient a detruire
+     * celui qu'on est en train de traiter, puis a rendre la main a du code qui
+     * continue de travailler dessus. On note l'intention ici, et le rendu de
+     * CEI l'applique en tete d'image, pile d'evenements deroulee.
+     */
+    private com.ceketrum.cei.gui.screen.CeiConfigScreen pendingScreen = null;
     private boolean hasCheckedHelpPopup = false;
 
     public CeiModule() {
@@ -86,6 +106,20 @@ public class CeiModule {
                       Font textRenderer,
                       net.minecraft.world.item.crafting.RecipeAccess recipeAccess,
                       net.minecraft.core.RegistryAccess registryManager) {
+        // Un changement d'ecran demande par un clic s'applique ICI, en tete
+        // d'image : la pile d'evenements est deroulee, plus personne ne
+        // travaille sur l'ecran qu'on remplace.
+        if (pendingScreen != null) {
+            com.ceketrum.cei.gui.screen.CeiConfigScreen next = pendingScreen;
+            pendingScreen = null;
+            CEI_NAV.info("[cei-nav] application du report : installation de l'ecran");
+            Minecraft.getInstance().setScreen(next);
+            CEI_NAV.info("[cei-nav] ecran installe");
+            // Ne rien dessiner de plus : ce panneau appartient a l'ecran qui
+            // vient d'etre remplace.
+            return;
+        }
+
         // Rendre le panneau CEI (inclut la barre de recherche)
         panelRenderer.render(context, screenHeight, screenWidth, textRenderer, (double) mouseX, (double) mouseY);
 
@@ -330,7 +364,11 @@ public class CeiModule {
         if (panelRenderer.isSettingsButtonClicked((int) mouseX, (int) mouseY, ceiX, ceiY, ceiWidth)) {
             Minecraft client = Minecraft.getInstance();
             if (client.screen != null) {
-                client.setScreen(new CeiConfigScreen(client.screen));
+                // On ne change PAS d'ecran ici : ce clic est traite par
+                // l'ecran qu'on s'appreterait a detruire. On note l'intention,
+                // le rendu l'appliquera en tete de la prochaine image.
+                CEI_NAV.info("[cei-nav] bouton parametres clique -- report a la prochaine image");
+                pendingScreen = new CeiConfigScreen(client.screen);
             }
             return true;
         }
